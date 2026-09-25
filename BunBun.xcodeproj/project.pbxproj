@@ -25,6 +25,12 @@
 		A10000000000000000000010 /* BunnyCelebrateSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* BunnyCelebrateSheet.png */; };
 		A10000000000000000000011 /* BunnyAdvanceSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* BunnyAdvanceSheet.png */; };
 		A10000000000000000000012 /* BunnyDanceSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* BunnyDanceSheet.png */; };
+		A10000000000000000000013 /* BunnyAimSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* BunnyAimSheet.png */; };
+		A10000000000000000000014 /* BunnyBombSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* BunnyBombSheet.png */; };
+		A10000000000000000000015 /* BunnyLineSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* BunnyLineSheet.png */; };
+		A10000000000000000000016 /* BunnyRescueSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* BunnyRescueSheet.png */; };
+		A10000000000000000000017 /* BunnyDanceTwoStepSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* BunnyDanceTwoStepSheet.png */; };
+		A10000000000000000000018 /* BunnyDanceHopSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* BunnyDanceHopSheet.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +66,12 @@
 		B10000000000000000000014 /* BunnyCelebrateSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyCelebrateSheet.png; sourceTree = "<group>"; };
 		B10000000000000000000015 /* BunnyAdvanceSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyAdvanceSheet.png; sourceTree = "<group>"; };
 		B10000000000000000000016 /* BunnyDanceSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyDanceSheet.png; sourceTree = "<group>"; };
+		B10000000000000000000017 /* BunnyAimSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyAimSheet.png; sourceTree = "<group>"; };
+		B10000000000000000000018 /* BunnyBombSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyBombSheet.png; sourceTree = "<group>"; };
+		B10000000000000000000019 /* BunnyLineSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyLineSheet.png; sourceTree = "<group>"; };
+		B1000000000000000000001A /* BunnyRescueSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyRescueSheet.png; sourceTree = "<group>"; };
+		B1000000000000000000001B /* BunnyDanceTwoStepSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyDanceTwoStepSheet.png; sourceTree = "<group>"; };
+		B1000000000000000000001C /* BunnyDanceHopSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyDanceHopSheet.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -160,6 +172,12 @@
 				B10000000000000000000014 /* BunnyCelebrateSheet.png */,
 				B10000000000000000000015 /* BunnyAdvanceSheet.png */,
 				B10000000000000000000016 /* BunnyDanceSheet.png */,
+				B10000000000000000000017 /* BunnyAimSheet.png */,
+				B10000000000000000000018 /* BunnyBombSheet.png */,
+				B10000000000000000000019 /* BunnyLineSheet.png */,
+				B1000000000000000000001A /* BunnyRescueSheet.png */,
+				B1000000000000000000001B /* BunnyDanceTwoStepSheet.png */,
+				B1000000000000000000001C /* BunnyDanceHopSheet.png */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -249,6 +267,12 @@
 				A10000000000000000000010 /* BunnyCelebrateSheet.png in Resources */,
 				A10000000000000000000011 /* BunnyAdvanceSheet.png in Resources */,
 				A10000000000000000000012 /* BunnyDanceSheet.png in Resources */,
+				A10000000000000000000013 /* BunnyAimSheet.png in Resources */,
+				A10000000000000000000014 /* BunnyBombSheet.png in Resources */,
+				A10000000000000000000015 /* BunnyLineSheet.png in Resources */,
+				A10000000000000000000016 /* BunnyRescueSheet.png in Resources */,
+				A10000000000000000000017 /* BunnyDanceTwoStepSheet.png in Resources */,
+				A10000000000000000000018 /* BunnyDanceHopSheet.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

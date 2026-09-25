@@ -275,11 +275,15 @@ After the introduction, normal colors resume and both special types recur in the
 
 The blue bunny concept is now used as real prototype presentation art while remaining isolated from the rules layer.
 
-- Four generated 4×2 sprite sheets provide eight-frame idle, match-celebration, board-advance reaction, and dance-party motions.
+- Ten generated 4×2 sprite sheets provide eight-frame idle, aim, match-celebration, board-advance, bomb-anticipation, line-anticipation, rescue, and three dance-party motions.
 - The original generated sheets are retained in `Mockup Images`; runtime copies live in `BunBun/Resources`.
 - The blue master artwork is hue-shifted at runtime and cached for all six gameplay colors. Neutral black eyes and white highlights remain intact.
-- Idle loops receive a small deterministic phase offset so the formation does not move in mechanical lockstep.
-- Matched bunnies celebrate before leaving the board, survivors react before Classic advancement, and active dance parties replace idle motion with the dance loop.
+- Idle loops receive deterministic phase and tempo offsets plus a subtle size variation so the formation does not move in mechanical lockstep.
+- Bunnies in the highlighted aiming lane react to the player's attention.
+- Matched bunnies celebrate before leaving the board, with stronger timing and scale on deeper chains.
+- Bomb and line bunnies use different wind-ups and badge motion before their effects fire.
+- Survivors react before Classic advancement, while bunnies reaching the hazard perform a safe comic rescue instead of simply falling off-screen.
+- Active dance parties choose among three stable per-bunny dance loops.
 - Special-bunny badges and effects remain presentation overlays, keeping the same character animation reusable for normal, bomb, and line bunnies.
 
 These sprite sheets are prototype assets, not a commitment to the final 2D/3D rendering approach described in the art and animation research.

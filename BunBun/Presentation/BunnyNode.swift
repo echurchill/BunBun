@@ -4,9 +4,15 @@ import UIKit
 
 private enum BunnyMotion: String {
     case idle = "BunnyIdleSheet"
+    case aim = "BunnyAimSheet"
     case celebration = "BunnyCelebrateSheet"
     case advance = "BunnyAdvanceSheet"
     case dance = "BunnyDanceSheet"
+    case danceTwoStep = "BunnyDanceTwoStepSheet"
+    case danceHop = "BunnyDanceHopSheet"
+    case bomb = "BunnyBombSheet"
+    case line = "BunnyLineSheet"
+    case rescue = "BunnyRescueSheet"
 }
 
 /// Splits the generated 4x2 sheets and hue-shifts the blue master art so every
@@ -81,15 +87,23 @@ final class BunnyNode: SKNode {
     let bunnyID: UUID
 
     private let bunnyColor: BunnyColor
+    private let bunnyKind: BunnyKind
     private var sprite: SKSpriteNode?
+    private weak var specialBadge: SKNode?
     private let cellWidth: CGFloat
     private let cellHeight: CGFloat
+    private let animationSeed: Int
+    private var isAiming = false
+    private var isDancing = false
+    private var isPerformingOneShot = false
 
     init(bunny: Bunny, cellWidth: CGFloat, cellHeight: CGFloat, color: SKColor) {
         bunnyID = bunny.id
         bunnyColor = bunny.color
+        bunnyKind = bunny.kind
         self.cellWidth = cellWidth
         self.cellHeight = cellHeight
+        animationSeed = bunny.id.uuidString.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         super.init()
         name = "bunny:\(bunny.id.uuidString)"
 
@@ -100,7 +114,10 @@ final class BunnyNode: SKNode {
         if let firstTexture = idleTextures.first {
             let sprite = SKSpriteNode(
                 texture: firstTexture,
-                size: CGSize(width: cellWidth * 1.08, height: cellHeight * 1.08)
+                size: CGSize(
+                    width: cellWidth * (1.05 + CGFloat(animationSeed % 3) * 0.025),
+                    height: cellHeight * (1.05 + CGFloat(animationSeed % 3) * 0.025)
+                )
             )
             sprite.position.y = cellHeight * 0.04
             sprite.zPosition = 0
@@ -114,8 +131,22 @@ final class BunnyNode: SKNode {
         addSpecialMarker(for: bunny.kind, bodyWidth: bodyWidth, bodyHeight: bodyHeight)
     }
 
-    func playCelebration() {
-        guard play(.celebration, timePerFrame: 0.065, repeats: false) else {
+    func setAiming(_ aiming: Bool) {
+        guard aiming != isAiming else { return }
+        isAiming = aiming
+        guard !isDancing, !isPerformingOneShot else { return }
+
+        if aiming {
+            _ = play(.aim, timePerFrame: 0.105, repeats: true)
+        } else {
+            playIdle()
+        }
+    }
+
+    func playCelebration(chainDepth: Int) {
+        isPerformingOneShot = true
+        let speed = max(0.042, 0.068 - Double(chainDepth - 1) * 0.008)
+        guard play(.celebration, timePerFrame: speed, repeats: false) else {
             run(.sequence([
                 .scaleY(to: 0.84, duration: 0.08),
                 .scaleY(to: 1.18, duration: 0.12),
@@ -123,9 +154,19 @@ final class BunnyNode: SKNode {
             ]))
             return
         }
+
+        guard chainDepth > 1 else { return }
+        let emphasis = min(1.10 + CGFloat(chainDepth) * 0.05, 1.35)
+        run(.sequence([
+            .scale(to: emphasis, duration: 0.12),
+            .rotate(toAngle: chainDepth.isMultiple(of: 2) ? -0.08 : 0.08, duration: 0.08),
+            .rotate(toAngle: 0, duration: 0.08),
+            .scale(to: 1, duration: 0.12)
+        ]), withKey: "chainEmphasis")
     }
 
     func playAdvanceReaction() {
+        isPerformingOneShot = true
         guard play(.advance, timePerFrame: 0.07, repeats: false) else {
             run(.sequence([
                 .scaleY(to: 0.82, duration: 0.14),
@@ -135,11 +176,47 @@ final class BunnyNode: SKNode {
         }
     }
 
+    func playSpecialAnticipation() {
+        let motion: BunnyMotion
+        switch bunnyKind {
+        case .normal:
+            return
+        case .redBomb:
+            motion = .bomb
+            specialBadge?.run(.repeat(.sequence([
+                .scale(to: 1.35, duration: 0.08),
+                .scale(to: 0.88, duration: 0.08)
+            ]), count: 3))
+        case .lineClear:
+            motion = .line
+            specialBadge?.run(.sequence([
+                .rotate(toAngle: .pi / 4, duration: 0.12, shortestUnitArc: true),
+                .scale(to: 1.35, duration: 0.10),
+                .scale(to: 1, duration: 0.08),
+                .rotate(toAngle: 0, duration: 0.12, shortestUnitArc: true)
+            ]))
+        }
+
+        isPerformingOneShot = true
+        _ = play(motion, timePerFrame: 0.055, repeats: false)
+    }
+
+    func playRescue() {
+        isPerformingOneShot = true
+        _ = play(.rescue, timePerFrame: 0.07, repeats: false)
+    }
+
     func setDancing(_ dancing: Bool) {
+        isDancing = dancing
         removeAction(forKey: "fallbackDance")
         zRotation = 0
 
-        if dancing, play(.dance, timePerFrame: 0.10, repeats: true) {
+        let danceMotion: BunnyMotion = switch animationSeed % 3 {
+        case 0: .dance
+        case 1: .danceTwoStep
+        default: .danceHop
+        }
+        if dancing, play(danceMotion, timePerFrame: 0.10, repeats: true) {
             return
         }
         if sprite != nil {
@@ -165,9 +242,9 @@ final class BunnyNode: SKNode {
         guard !textures.isEmpty else { return }
 
         sprite.removeAction(forKey: "textureAnimation")
-        let seed = bunnyID.uuidString.unicodeScalars.reduce(0) { $0 + Int($1.value) }
-        let delay = Double(seed % 8) * 0.018
-        let animation = SKAction.repeatForever(.animate(with: textures, timePerFrame: 0.12))
+        let delay = Double(animationSeed % 8) * 0.018
+        let idleSpeed = [0.105, 0.12, 0.135][animationSeed % 3]
+        let animation = SKAction.repeatForever(.animate(with: textures, timePerFrame: idleSpeed))
         sprite.run(.sequence([.wait(forDuration: delay), animation]), withKey: "textureAnimation")
     }
 
@@ -184,10 +261,23 @@ final class BunnyNode: SKNode {
         } else {
             sprite.run(.sequence([
                 animation,
-                .run { [weak self] in self?.playIdle() }
+                .run { [weak self] in
+                    self?.isPerformingOneShot = false
+                    self?.resumeAmbientMotion()
+                }
             ]), withKey: "textureAnimation")
         }
         return true
+    }
+
+    private func resumeAmbientMotion() {
+        if isDancing {
+            setDancing(true)
+        } else if isAiming {
+            _ = play(.aim, timePerFrame: 0.105, repeats: true)
+        } else {
+            playIdle()
+        }
     }
 
     private func addPlaceholder(color: SKColor, bodyWidth: CGFloat, bodyHeight: CGFloat) {
@@ -231,6 +321,7 @@ final class BunnyNode: SKNode {
         badge.lineWidth = 1.2
         badge.zPosition = 3
         addChild(badge)
+        specialBadge = badge
 
         let symbol = SKLabelNode(fontNamed: "AvenirNext-Heavy")
         symbol.text = kind == .redBomb ? "✹" : "✚"

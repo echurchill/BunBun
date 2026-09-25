@@ -48,6 +48,7 @@ final class GameScene: SKScene {
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         highlightedLane = nil
         drawGrid()
+        updateAimReactions()
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -102,6 +103,7 @@ final class GameScene: SKScene {
         highlightedLane = nil
         isAnimating = true
         drawGrid()
+        updateAimReactions()
 
         animateShot(
             bunny: bunny,
@@ -203,16 +205,26 @@ final class GameScene: SKScene {
         addConfetti(for: stage.depth)
 
         for activation in stage.specialActivations {
-            addSpecialEffect(activation)
+            run(.sequence([
+                .wait(forDuration: 0.34),
+                .run { [weak self] in self?.addSpecialEffect(activation) }
+            ]))
         }
 
+        let specialCells = Set(stage.specialActivations.map(\.cell))
         for cell in stage.removedCells {
             guard let node = bunnyNode(at: cell, on: stage.boardBefore) else { continue }
             let delay = Double((cell.column + cell.row) % 3) * 0.035
             node.run(.sequence([
                 .wait(forDuration: delay),
-                .run { node.playCelebration() },
-                .wait(forDuration: 0.42),
+                .run {
+                    if specialCells.contains(cell) {
+                        node.playSpecialAnticipation()
+                    } else {
+                        node.playCelebration(chainDepth: stage.depth)
+                    }
+                },
+                .wait(forDuration: 0.52),
                 .group([
                     .scale(to: 0.05, duration: 0.14),
                     .fadeOut(withDuration: 0.14)
@@ -221,12 +233,12 @@ final class GameScene: SKScene {
             addPop(
                 at: point(for: cell),
                 color: nodeColor(at: cell, on: stage.boardBefore),
-                delay: delay + 0.34
+                delay: delay + 0.43
             )
         }
 
         run(.sequence([
-            .wait(forDuration: 0.64),
+            .wait(forDuration: 0.74),
             .run { [weak self] in
                 var survivors = stage.boardBefore
                 survivors.remove(at: stage.removedCells)
@@ -253,16 +265,18 @@ final class GameScene: SKScene {
             bunny.playAdvanceReaction()
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let postTransitionWait = outcome.fallenBunnies.isEmpty ? 0.40 : 0.74
         run(.sequence([
             .wait(forDuration: 0.56),
             .run { [weak self] in
                 self?.animateBoardTransition(
                     from: outcome.boardAfterResolution,
                     to: outcome.boardAfterTurn,
-                    duration: 0.34
+                    duration: 0.34,
+                    rescuesMissingBunnies: !outcome.fallenBunnies.isEmpty
                 )
             },
-            .wait(forDuration: 0.40),
+            .wait(forDuration: postTransitionWait),
             .run { [weak self] in
                 if !outcome.fallenBunnies.isEmpty {
                     self?.flashMessage(
@@ -282,7 +296,12 @@ final class GameScene: SKScene {
         showEndStateIfNeeded()
     }
 
-    private func animateBoardTransition(from oldBoard: Board, to newBoard: Board, duration: TimeInterval) {
+    private func animateBoardTransition(
+        from oldBoard: Board,
+        to newBoard: Board,
+        duration: TimeInterval,
+        rescuesMissingBunnies: Bool = false
+    ) {
         updateBunnies(oldBoard)
         let newLocations = Dictionary(uniqueKeysWithValues: newBoard.occupants.map { ($0.value.id, $0.key) })
 
@@ -292,6 +311,15 @@ final class GameScene: SKScene {
                 let action = SKAction.move(to: point(for: newCell), duration: duration)
                 action.timingMode = .easeInEaseOut
                 node.run(action)
+            } else if rescuesMissingBunnies, let bunnyNode = node as? BunnyNode {
+                bunnyNode.playRescue()
+                bunnyNode.run(.sequence([
+                    .wait(forDuration: 0.48),
+                    .group([
+                        .moveBy(x: 0, y: cellHeight * 0.72, duration: 0.18),
+                        .fadeOut(withDuration: 0.18)
+                    ])
+                ]))
             } else {
                 node.run(.group([
                     .moveBy(x: 0, y: -cellHeight * 1.2, duration: duration),
@@ -300,8 +328,9 @@ final class GameScene: SKScene {
             }
         }
 
+        let refreshDelay = rescuesMissingBunnies ? max(duration, 0.70) : duration
         run(.sequence([
-            .wait(forDuration: duration),
+            .wait(forDuration: refreshDelay),
             .run { [weak self] in self?.updateBunnies(newBoard, animateEntrants: true) }
         ]))
     }
@@ -311,6 +340,7 @@ final class GameScene: SKScene {
         layoutBoard()
         drawGrid()
         updateBunnies(state.board)
+        updateAimReactions()
         drawHUD()
         if showsDanceParty {
             configureDancePartyBackdrop()
@@ -554,6 +584,20 @@ final class GameScene: SKScene {
         guard let cell = boardCell(at: point) else { return }
         highlightedLane = selectedSide == .bottom ? cell.column : cell.row
         drawGrid()
+        updateAimReactions()
+    }
+
+    private func updateAimReactions() {
+        for (cell, bunny) in state.board.occupants {
+            guard let node = bunnyLayer.childNode(
+                withName: "bunny:\(bunny.id.uuidString)"
+            ) as? BunnyNode else { continue }
+
+            let isInHighlightedLane = highlightedLane.map { lane in
+                selectedSide == .bottom ? cell.column == lane : cell.row == lane
+            } ?? false
+            node.setAiming(isInHighlightedLane)
+        }
     }
 
     private func point(for cell: Cell) -> CGPoint {
