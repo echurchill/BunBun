@@ -6,6 +6,7 @@ enum BunnyColor: String, CaseIterable, Codable, Sendable {
     case orange
     case pink
     case purple
+    case red
 }
 
 enum BunnyKind: String, Codable, Sendable {

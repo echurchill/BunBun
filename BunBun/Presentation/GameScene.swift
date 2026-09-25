@@ -88,8 +88,8 @@ final class GameScene: SKScene {
     }
 
     private func performLaunch(lane: Int) {
-        let color = PrototypeLevel.shotColor(at: currentColorIndex)
-        let bunny = Bunny(color: color)
+        let shot = PrototypeLevel.shot(at: currentColorIndex)
+        let bunny = shot.makeBunny()
         let newRow = PrototypeLevel.advanceRow(forTurn: currentColorIndex)
 
         let outcome = state.launch(
@@ -105,7 +105,6 @@ final class GameScene: SKScene {
 
         animateShot(
             bunny: bunny,
-            color: color,
             side: selectedSide,
             lane: lane,
             result: outcome.launchResult
@@ -116,7 +115,6 @@ final class GameScene: SKScene {
 
     private func animateShot(
         bunny: Bunny,
-        color: BunnyColor,
         side: LaunchSide,
         lane: Int,
         result: LaunchResult,
@@ -145,7 +143,7 @@ final class GameScene: SKScene {
             bunny: bunny,
             cellWidth: cellWidth,
             cellHeight: cellHeight,
-            color: spriteColor(for: color)
+            color: spriteColor(for: bunny.color)
         )
         projectile.position = start
         projectile.setScale(0.78)
@@ -189,29 +187,46 @@ final class GameScene: SKScene {
 
         let stage = stages[index]
         updateBunnies(stage.boardBefore)
-        flashMessage(stage.depth == 1 ? "MATCH!" : "CHAIN ×\(stage.depth)", color: .systemYellow)
+        let specialKinds = Set(stage.specialActivations.map(\.kind))
+        let message: String
+        if specialKinds.count > 1 {
+            message = "SPECIAL CHAIN!"
+        } else if specialKinds.contains(.redBomb) {
+            message = "BUNNY BOOM!"
+        } else if specialKinds.contains(.lineClear) {
+            message = "LINE CLEAR!"
+        } else {
+            message = stage.depth == 1 ? "MATCH!" : "CHAIN ×\(stage.depth)"
+        }
+        flashMessage(message, color: .systemYellow)
         UINotificationFeedbackGenerator().notificationOccurred(stage.depth == 1 ? .success : .warning)
         addConfetti(for: stage.depth)
+
+        for activation in stage.specialActivations {
+            addSpecialEffect(activation)
+        }
 
         for cell in stage.removedCells {
             guard let node = bunnyNode(at: cell, on: stage.boardBefore) else { continue }
             let delay = Double((cell.column + cell.row) % 3) * 0.035
             node.run(.sequence([
                 .wait(forDuration: delay),
+                .run { node.playCelebration() },
+                .wait(forDuration: 0.42),
                 .group([
-                    .scale(to: 1.45, duration: 0.13),
-                    .rotate(byAngle: .pi / 5, duration: 0.13)
-                ]),
-                .group([
-                    .scale(to: 0.05, duration: 0.16),
-                    .fadeOut(withDuration: 0.16)
+                    .scale(to: 0.05, duration: 0.14),
+                    .fadeOut(withDuration: 0.14)
                 ])
             ]))
-            addPop(at: point(for: cell), color: nodeColor(at: cell, on: stage.boardBefore))
+            addPop(
+                at: point(for: cell),
+                color: nodeColor(at: cell, on: stage.boardBefore),
+                delay: delay + 0.34
+            )
         }
 
         run(.sequence([
-            .wait(forDuration: 0.38),
+            .wait(forDuration: 0.64),
             .run { [weak self] in
                 var survivors = stage.boardBefore
                 survivors.remove(at: stage.removedCells)
@@ -233,13 +248,20 @@ final class GameScene: SKScene {
         }
 
         flashMessage("HOP!", color: .systemPink)
-        animateBoardTransition(
-            from: outcome.boardAfterResolution,
-            to: outcome.boardAfterTurn,
-            duration: 0.34
-        )
+        updateBunnies(outcome.boardAfterResolution)
+        for case let bunny as BunnyNode in bunnyLayer.children {
+            bunny.playAdvanceReaction()
+        }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         run(.sequence([
+            .wait(forDuration: 0.56),
+            .run { [weak self] in
+                self?.animateBoardTransition(
+                    from: outcome.boardAfterResolution,
+                    to: outcome.boardAfterTurn,
+                    duration: 0.34
+                )
+            },
             .wait(forDuration: 0.40),
             .run { [weak self] in
                 if !outcome.fallenBunnies.isEmpty {
@@ -379,18 +401,23 @@ final class GameScene: SKScene {
         hudLayer.removeAllChildren()
 
         let title = SKLabelNode(fontNamed: "AvenirNext-Heavy")
-        title.text = "BUNBUN  •  BUNNY LAB 0.3"
+        title.text = "BUNBUN  •  BUNNY LAB 0.4"
         title.fontSize = 19
         title.fontColor = .white
         title.position = CGPoint(x: size.width / 2, y: size.height - 82)
         hudLayer.addChild(title)
 
         let subtitle = SKLabelNode(fontNamed: "AvenirNext-Medium")
-        if currentColorIndex == 0 {
+        switch currentColorIndex {
+        case 0:
             subtitle.text = "Try LEFT on the row with the blue pair"
-        } else if currentColorIndex == 1 {
+        case 1:
             subtitle.text = "Now try RIGHT on the row with the green pair"
-        } else {
+        case 2:
+            subtitle.text = "BOMB: try LEFT on the red pair"
+        case 3:
+            subtitle.text = "LINE: try RIGHT on the purple pair"
+        default:
             subtitle.text = "Tap a rail, then tap or drag to a lane"
         }
         subtitle.fontSize = 12
@@ -418,12 +445,13 @@ final class GameScene: SKScene {
             addLauncher(side, at: launcherPosition(for: side))
         }
 
-        let color = PrototypeLevel.shotColor(at: currentColorIndex)
+        let shot = PrototypeLevel.shot(at: currentColorIndex)
+        let previewBunny = shot.makeBunny()
         let preview = BunnyNode(
-            bunny: Bunny(color: color),
+            bunny: previewBunny,
             cellWidth: 22,
             cellHeight: 31,
-            color: spriteColor(for: color)
+            color: spriteColor(for: shot.color)
         )
         preview.position = CGPoint(x: size.width / 2 - 75, y: 69)
         preview.setScale(0.82)
@@ -431,7 +459,12 @@ final class GameScene: SKScene {
 
         let label = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
         let multiplier = state.isDancePartyActive ? "   •   2×" : ""
-        label.text = "Next   •   Score \(state.score)   •   Hop in \(3 - state.launchesSinceAdvance)\(multiplier)"
+        let nextName = switch shot.kind {
+        case .normal: "Next"
+        case .redBomb: "Next BOMB"
+        case .lineClear: "Next LINE"
+        }
+        label.text = "\(nextName)   •   Score \(state.score)   •   Hop in \(3 - state.launchesSinceAdvance)\(multiplier)"
         label.fontSize = 12
         label.fontColor = .white
         label.horizontalAlignmentMode = .left
@@ -557,16 +590,16 @@ final class GameScene: SKScene {
         return nil
     }
 
-    private func bunnyNode(at cell: Cell, on board: Board) -> SKNode? {
+    private func bunnyNode(at cell: Cell, on board: Board) -> BunnyNode? {
         guard let bunny = board[cell] else { return nil }
-        return bunnyLayer.childNode(withName: "bunny:\(bunny.id.uuidString)")
+        return bunnyLayer.childNode(withName: "bunny:\(bunny.id.uuidString)") as? BunnyNode
     }
 
     private func nodeColor(at cell: Cell, on board: Board) -> SKColor {
         board[cell].map { spriteColor(for: $0.color) } ?? .white
     }
 
-    private func addPop(at position: CGPoint, color: SKColor) {
+    private func addPop(at position: CGPoint, color: SKColor, delay: TimeInterval = 0) {
         let ring = SKShapeNode(circleOfRadius: cellWidth * 0.24)
         ring.position = position
         ring.strokeColor = color
@@ -575,12 +608,68 @@ final class GameScene: SKScene {
         ring.zPosition = 30
         effectLayer.addChild(ring)
         ring.run(.sequence([
+            .wait(forDuration: delay),
             .group([
                 .scale(to: 2.2, duration: 0.28),
                 .fadeOut(withDuration: 0.28)
             ]),
             .removeFromParent()
         ]))
+    }
+
+    private func addSpecialEffect(_ activation: SpecialActivation) {
+        switch activation.kind {
+        case .normal:
+            break
+        case .redBomb:
+            let center = point(for: activation.cell)
+            let blast = SKShapeNode(circleOfRadius: max(cellWidth, cellHeight) * 0.44)
+            blast.position = center
+            blast.fillColor = .systemRed.withAlphaComponent(0.42)
+            blast.strokeColor = .systemYellow
+            blast.lineWidth = 5
+            blast.zPosition = 29
+            effectLayer.addChild(blast)
+            blast.run(.sequence([
+                .group([
+                    .scale(to: 3.0, duration: 0.30),
+                    .fadeOut(withDuration: 0.30)
+                ]),
+                .removeFromParent()
+            ]))
+
+        case .lineClear:
+            let center = point(for: activation.cell)
+            let horizontal = SKShapeNode(
+                rectOf: CGSize(width: boardWidth + cellWidth, height: max(7, cellHeight * 0.22)),
+                cornerRadius: 4
+            )
+            horizontal.position = CGPoint(x: boardOrigin.x + boardWidth / 2, y: center.y)
+
+            let vertical = SKShapeNode(
+                rectOf: CGSize(width: max(7, cellWidth * 0.22), height: boardHeight + cellHeight),
+                cornerRadius: 4
+            )
+            vertical.position = CGPoint(x: center.x, y: boardOrigin.y + boardHeight / 2)
+
+            for beam in [horizontal, vertical] {
+                beam.fillColor = .systemPurple.withAlphaComponent(0.64)
+                beam.strokeColor = .white
+                beam.lineWidth = 2
+                beam.zPosition = 29
+                beam.setScale(0.08)
+                effectLayer.addChild(beam)
+                beam.run(.sequence([
+                    .group([
+                        .scale(to: 1, duration: 0.12),
+                        .fadeAlpha(to: 0.82, duration: 0.12)
+                    ]),
+                    .wait(forDuration: 0.10),
+                    .fadeOut(withDuration: 0.15),
+                    .removeFromParent()
+                ]))
+            }
+        }
     }
 
     private func addConfetti(for chainDepth: Int) {
@@ -731,6 +820,7 @@ final class GameScene: SKScene {
         case .orange: .systemOrange
         case .pink: .systemPink
         case .purple: .systemPurple
+        case .red: .systemRed
         }
     }
 

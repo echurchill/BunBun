@@ -1,6 +1,6 @@
 # BunBun Gameplay Specification
 
-**Prototype:** 0.3 — Pressure and Party Loop
+**Prototype:** 0.4 — Special Bunnies and Level Tuning
 **Platform:** iPhone  
 **Technology:** Swift + SpriteKit  
 **Gift date:** December 23, 2026  
@@ -63,9 +63,15 @@ This document keeps three categories separate:
 
 ### Special bunnies
 
-- A red special bunny is associated with an explosion that removes nearby bunnies when matched.
-- A purple special bunny is associated with a row/column clear when matched.
-- Special-bunny details remain outside Prototype 0.1 until their exact triggering and affected area are verified.
+- Contemporary coverage says matching three red bunnies removes the bunnies around them.
+- The same coverage says matching three purple bunnies removes every bunny in a row or column, regardless of color.
+- A later retrospective independently describes red bunnies removing nearby dancers and purple bunnies clearing their rows and columns.
+- The surviving descriptions do not settle the exact red blast radius, how the purple direction is selected, or whether one special can activate another. Those details remain prototype interpretations.
+
+Sources:
+
+- [GameSpot hands-on preview, October 11, 2007](https://www.gamespot.com/articles/boogie-bunnies-hands-on/1100-6180794/)
+- [The Game Hoard retrospective, June 24, 2024](https://thegamehoard.com/2024/06/24/boogie-bunnies-xbox-360/)
 
 ### Modes and presentation
 
@@ -107,7 +113,7 @@ Vertical compaction is the largest provisional mechanical assumption in Prototyp
 ### Prototype scoring
 
 - 100 points per removed bunny, multiplied by the one-based chain stage.
-- Progress, dance meter, bombs, line clears, win/loss tuning, and level content are represented in the model or roadmap but are not active gameplay systems yet.
+- Progress, dance, danger, win/loss, bombs, and line clears are active in Prototype 0.4. Their exact values are provisional BunBun tuning rather than reconstructed historical constants.
 
 ## 3. Proposed BunBun changes
 
@@ -200,7 +206,7 @@ Tested by Eddie on a physical iPhone on September 25, 2026.
 
 ## 9. Prototype 0.3 provisional tuning
 
-Prototype 0.3 activates the first complete play loop. These values are BunBun tuning choices for play testing, not reconstructed historical constants.
+Prototype 0.3 activated the first complete play loop. Its initial values were BunBun tuning choices for play testing, not reconstructed historical constants. Prototype 0.4 supersedes several of these values after adding specials and testing the guided opening.
 
 - Each cleared bunny adds 4 progress points.
 - Each fallen bunny removes 5 progress points.
@@ -215,3 +221,65 @@ Prototype 0.3 activates the first complete play loop. These values are BunBun tu
 - Arriving rows contain occasional gaps and continue to spawn only in the 10 ordinary lanes.
 
 Presentation during a dance party uses placeholder dancing, colored lights, confetti, haptics, and a 2× indicator. Final music, choreography, and character animation remain deferred.
+
+## 10. Prototype 0.4 special-bunny interpretations and tuning
+
+Prototype 0.4 adds strategic special bunnies while keeping their uncertain historical details explicit.
+
+### Special rules
+
+- A red bomb bunny participates in red matches like an ordinary red bunny.
+- When a matched red bomb activates, it removes occupied cells in a 3×3 area centered on itself.
+- A purple line bunny participates in purple matches like an ordinary purple bunny.
+- When a matched purple line bunny activates, it removes occupied cells across both its full row and full column.
+- If one special removes another special, the caught special activates during the same chain stage.
+- Overlapping effects remove and score each bunny only once.
+- After the expanded removal finishes, normal column compaction occurs and any new matches continue as the next chain stage.
+
+The 3×3 bomb, row-and-column cross, and cascading-special behavior are **BunBun prototype interpretations**. They are designed to be readable and satisfying while the original game's exact hidden rules remain uncertain.
+
+### First-level tuning
+
+- A bunny removed as part of an actual color match adds 3 progress points.
+- A bunny removed only by a special effect adds 1 progress point. This keeps a large line clear exciting without ending the level immediately.
+- Every Classic advancement removes 2 progress points, introducing the reconstructed progress-decay pressure in a turn-based form.
+- A fallen bunny removes 2 progress points and adds 6 danger points.
+- Every cleared bunny still relieves 3 danger points.
+- A matched bunny adds 14 dance points; a bunny removed only by a special adds 4 dance points.
+- Dance parties still last four launches and award 2× score.
+- Score remains 100 points per removed bunny multiplied by chain depth and the active dance multiplier.
+
+### Guided opening
+
+The first four supplied bunnies form a deterministic mechanics tour:
+
+1. Blue normal bunny: clear the prepared pair from the left.
+2. Green normal bunny: clear the prepared pair from the right.
+3. Red bomb bunny: match the prepared red pair from the left, demonstrate the blast, and survive the first Classic advancement.
+4. Purple line bunny: match the prepared purple pair from the right and demonstrate the row/column clear.
+
+After the introduction, normal colors resume and both special types recur in the deterministic prototype sequence. Arriving rows still use only ordinary colors and the 10 marching columns.
+
+### Prototype 0.4 acceptance criteria
+
+- Both special types are represented in the pure Swift model and require no SpriteKit dependency.
+- Special effects can remove differently colored bunnies.
+- A special caught by another special activates exactly once.
+- Special removals can compact the board and create later chain stages.
+- Match clears and effect-only clears can be tuned independently for progress and dance charge.
+- The first four guided shots demonstrate both specials without causing an immediate loss.
+- Placeholder presentation clearly distinguishes bomb and line bunnies and animates their effects.
+- Automated tests cover bomb radius, line clearing, cascading specials, special scoring, progress decay, and the guided opening.
+
+### Prototype animation pass
+
+The blue bunny concept is now used as real prototype presentation art while remaining isolated from the rules layer.
+
+- Four generated 4×2 sprite sheets provide eight-frame idle, match-celebration, board-advance reaction, and dance-party motions.
+- The original generated sheets are retained in `Mockup Images`; runtime copies live in `BunBun/Resources`.
+- The blue master artwork is hue-shifted at runtime and cached for all six gameplay colors. Neutral black eyes and white highlights remain intact.
+- Idle loops receive a small deterministic phase offset so the formation does not move in mechanical lockstep.
+- Matched bunnies celebrate before leaving the board, survivors react before Classic advancement, and active dance parties replace idle motion with the dance loop.
+- Special-bunny badges and effects remain presentation overlays, keeping the same character animation reusable for normal, bomb, and line bunnies.
+
+These sprite sheets are prototype assets, not a commitment to the final 2D/3D rendering approach described in the art and animation research.

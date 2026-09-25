@@ -10,8 +10,30 @@ final class GamePressureTests: XCTestCase {
         let outcome = state.launch(Bunny(color: .blue), from: .left, lane: 5)
 
         XCTAssertEqual(outcome.chain?.removedCount, 3)
-        XCTAssertEqual(state.progress, 12)
+        XCTAssertEqual(state.progress, 9)
         XCTAssertEqual(state.danceMeter, 42)
+    }
+
+    func testOpeningSequenceIntroducesBothSpecialBunnies() {
+        var state = GameState(board: PrototypeLevel.startingBoard())
+
+        let blue = state.launch(PrototypeLevel.shot(at: 0).makeBunny(), from: .left, lane: 5)
+        let green = state.launch(PrototypeLevel.shot(at: 1).makeBunny(), from: .right, lane: 2)
+        let bomb = state.launch(
+            PrototypeLevel.shot(at: 2).makeBunny(),
+            from: .left,
+            lane: 0,
+            newBackRow: PrototypeLevel.advanceRow(forTurn: 2)
+        )
+        let line = state.launch(PrototypeLevel.shot(at: 3).makeBunny(), from: .right, lane: 1)
+
+        XCTAssertEqual(blue.chain?.matchedCount, 3)
+        XCTAssertEqual(green.chain?.matchedCount, 3)
+        XCTAssertTrue(bomb.didAdvance)
+        XCTAssertEqual(bomb.chain?.stages.first?.specialActivations.map(\.kind), [.redBomb])
+        XCTAssertEqual(line.chain?.stages.first?.specialActivations.map(\.kind), [.lineClear])
+        XCTAssertGreaterThan(bomb.chain?.specialEffectRemovedCount ?? 0, 0)
+        XCTAssertGreaterThan(line.chain?.specialEffectRemovedCount ?? 0, 0)
     }
 
     func testDancePartyStartsThenDoublesFollowingMatch() {
@@ -42,15 +64,31 @@ final class GamePressureTests: XCTestCase {
 
         XCTAssertTrue(outcome.didAdvance)
         XCTAssertEqual(outcome.fallenBunnies.count, 1)
-        XCTAssertEqual(state.progress, 15)
-        XCTAssertEqual(state.danger, 12)
+        XCTAssertEqual(state.progress, 16)
+        XCTAssertEqual(outcome.progressDelta, -4)
+        XCTAssertEqual(state.danger, 6)
         XCTAssertEqual(state.status, .playing)
+    }
+
+    func testSpecialEffectBunniesAwardLessProgressThanMatchedBunnies() {
+        var board = Board()
+        XCTAssertTrue(board.place(Bunny(color: .red), at: Cell(column: 1, row: 1)))
+        XCTAssertTrue(board.place(Bunny(color: .red), at: Cell(column: 2, row: 1)))
+        XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: 1, row: 0)))
+        var state = GameState(board: board)
+
+        let outcome = state.launch(Bunny(color: .red, kind: .redBomb), from: .left, lane: 1)
+
+        XCTAssertEqual(outcome.chain?.matchedCount, 3)
+        XCTAssertEqual(outcome.chain?.specialEffectRemovedCount, 1)
+        XCTAssertEqual(state.progress, 10)
+        XCTAssertEqual(outcome.pointsAwarded, 400)
     }
 
     func testRepeatedPitPressureEventuallyLoses() {
         var board = Board()
         XCTAssertTrue(board.place(Bunny(color: .purple), at: Cell(column: 4, row: 0)))
-        var state = GameState(board: board, launchesSinceAdvance: 2, danger: 92)
+        var state = GameState(board: board, launchesSinceAdvance: 2, danger: 95)
 
         _ = state.launch(Bunny(color: .orange), from: .right, lane: 7)
 
@@ -62,7 +100,7 @@ final class GamePressureTests: XCTestCase {
         var board = Board()
         XCTAssertTrue(board.place(Bunny(color: .pink), at: Cell(column: 2, row: 2)))
         XCTAssertTrue(board.place(Bunny(color: .pink), at: Cell(column: 3, row: 2)))
-        var state = GameState(board: board, progress: 90)
+        var state = GameState(board: board, progress: 91)
 
         _ = state.launch(Bunny(color: .pink), from: .left, lane: 2)
 

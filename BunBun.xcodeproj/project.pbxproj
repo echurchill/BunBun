@@ -21,6 +21,10 @@
 		A1000000000000000000000C /* BunnyNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* BunnyNode.swift */; };
 		A1000000000000000000000D /* PrototypeLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* PrototypeLevel.swift */; };
 		A1000000000000000000000E /* GamePressureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* GamePressureTests.swift */; };
+		A1000000000000000000000F /* BunnyIdleSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* BunnyIdleSheet.png */; };
+		A10000000000000000000010 /* BunnyCelebrateSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* BunnyCelebrateSheet.png */; };
+		A10000000000000000000011 /* BunnyAdvanceSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* BunnyAdvanceSheet.png */; };
+		A10000000000000000000012 /* BunnyDanceSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* BunnyDanceSheet.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +56,10 @@
 		B10000000000000000000010 /* BunnyNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BunnyNode.swift; sourceTree = "<group>"; };
 		B10000000000000000000011 /* PrototypeLevel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrototypeLevel.swift; sourceTree = "<group>"; };
 		B10000000000000000000012 /* GamePressureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamePressureTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000013 /* BunnyIdleSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyIdleSheet.png; sourceTree = "<group>"; };
+		B10000000000000000000014 /* BunnyCelebrateSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyCelebrateSheet.png; sourceTree = "<group>"; };
+		B10000000000000000000015 /* BunnyAdvanceSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyAdvanceSheet.png; sourceTree = "<group>"; };
+		B10000000000000000000016 /* BunnyDanceSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyDanceSheet.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +97,7 @@
 				D20000000000000000000003 /* App */,
 				D20000000000000000000004 /* Game */,
 				D20000000000000000000005 /* Presentation */,
+				D20000000000000000000008 /* Resources */,
 			);
 			path = BunBun;
 			sourceTree = "<group>";
@@ -142,6 +151,17 @@
 				B1000000000000000000000D /* BunBunTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D20000000000000000000008 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000013 /* BunnyIdleSheet.png */,
+				B10000000000000000000014 /* BunnyCelebrateSheet.png */,
+				B10000000000000000000015 /* BunnyAdvanceSheet.png */,
+				B10000000000000000000016 /* BunnyDanceSheet.png */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -225,6 +245,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000000F /* BunnyIdleSheet.png in Resources */,
+				A10000000000000000000010 /* BunnyCelebrateSheet.png in Resources */,
+				A10000000000000000000011 /* BunnyAdvanceSheet.png in Resources */,
+				A10000000000000000000012 /* BunnyDanceSheet.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -24,11 +24,14 @@ struct TurnOutcome: Equatable, Sendable {
 struct GameState: Equatable, Sendable {
     static let launchesPerClassicAdvance = 3
     static let maximumMeterValue = 100
-    static let progressPerClearedBunny = 4
-    static let progressLostPerFallenBunny = 5
-    static let dangerPerFallenBunny = 12
+    static let progressPerMatchedBunny = 3
+    static let progressPerSpecialEffectBunny = 1
+    static let progressDecayPerAdvance = 2
+    static let progressLostPerFallenBunny = 2
+    static let dangerPerFallenBunny = 6
     static let dangerReliefPerClearedBunny = 3
-    static let danceChargePerClearedBunny = 14
+    static let danceChargePerMatchedBunny = 14
+    static let danceChargePerSpecialEffectBunny = 4
     static let dancePartyLength = 4
 
     private(set) var board: Board
@@ -96,6 +99,8 @@ struct GameState: Equatable, Sendable {
         var chain: ChainResolution?
         var points = 0
         var removedCount = 0
+        var matchedCount = 0
+        var specialEffectRemovedCount = 0
         var dancePartyStarted = false
 
         if case let .placed(cell) = launchResult {
@@ -103,6 +108,8 @@ struct GameState: Equatable, Sendable {
             board = resolution.board
             chain = resolution.stages.isEmpty ? nil : resolution
             removedCount = resolution.removedCount
+            matchedCount = resolution.matchedCount
+            specialEffectRemovedCount = resolution.specialEffectRemovedCount
             points = resolution.stages.reduce(0) { partial, stage in
                 partial + stage.removedCells.count * 100 * stage.depth
             } * multiplier
@@ -112,18 +119,23 @@ struct GameState: Equatable, Sendable {
         if removedCount > 0 {
             progress = min(
                 Self.maximumMeterValue,
-                progress + removedCount * Self.progressPerClearedBunny
+                progress
+                    + matchedCount * Self.progressPerMatchedBunny
+                    + specialEffectRemovedCount * Self.progressPerSpecialEffectBunny
             )
             danger = max(0, danger - removedCount * Self.dangerReliefPerClearedBunny)
+
+            let danceCharge = matchedCount * Self.danceChargePerMatchedBunny
+                + specialEffectRemovedCount * Self.danceChargePerSpecialEffectBunny
 
             if danceWasActive {
                 // Charge the next party more slowly while the current one is active.
                 danceMeter = min(
                     Self.maximumMeterValue - 1,
-                    danceMeter + removedCount * (Self.danceChargePerClearedBunny / 2)
+                    danceMeter + danceCharge / 2
                 )
             } else {
-                danceMeter += removedCount * Self.danceChargePerClearedBunny
+                danceMeter += danceCharge
                 if danceMeter >= Self.maximumMeterValue {
                     danceMeter -= Self.maximumMeterValue
                     dancePartyTurnsRemaining = Self.dancePartyLength
@@ -143,6 +155,7 @@ struct GameState: Equatable, Sendable {
             fallen = board.advance(newBackRow: newBackRow)
             launchesSinceAdvance = 0
             didAdvance = true
+            progress = max(0, progress - Self.progressDecayPerAdvance)
         }
 
         if !fallen.isEmpty {
