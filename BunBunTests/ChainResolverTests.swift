@@ -18,6 +18,8 @@ final class ChainResolverTests: XCTestCase {
         XCTAssertEqual(result.stages.count, 2)
         XCTAssertEqual(result.stages[0].depth, 1)
         XCTAssertEqual(result.stages[0].removedCells.count, 3)
+        XCTAssertEqual(result.stages[0].boardBefore.occupiedCells.count, 6)
+        XCTAssertEqual(result.stages[0].boardAfter.occupiedCells.count, 3)
         XCTAssertEqual(result.stages[1].depth, 2)
         XCTAssertEqual(result.stages[1].removedCells.count, 3)
         XCTAssertEqual(result.removedCount, 6)

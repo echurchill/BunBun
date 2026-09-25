@@ -18,6 +18,9 @@
 		A10000000000000000000009 /* MatchEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* MatchEngineTests.swift */; };
 		A1000000000000000000000A /* ChainResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* ChainResolverTests.swift */; };
 		A1000000000000000000000B /* BoardAndTurnTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* BoardAndTurnTests.swift */; };
+		A1000000000000000000000C /* BunnyNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* BunnyNode.swift */; };
+		A1000000000000000000000D /* PrototypeLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* PrototypeLevel.swift */; };
+		A1000000000000000000000E /* GamePressureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* GamePressureTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +49,9 @@
 		B1000000000000000000000D /* BunBunTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BunBunTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000000000000000000000E /* BunBun_Gameplay_Specification.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BunBun_Gameplay_Specification.md; sourceTree = "<group>"; };
 		B1000000000000000000000F /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		B10000000000000000000010 /* BunnyNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BunnyNode.swift; sourceTree = "<group>"; };
+		B10000000000000000000011 /* PrototypeLevel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrototypeLevel.swift; sourceTree = "<group>"; };
+		B10000000000000000000012 /* GamePressureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamePressureTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,6 +110,7 @@
 				B10000000000000000000005 /* MatchEngine.swift */,
 				B10000000000000000000006 /* ChainResolver.swift */,
 				B10000000000000000000007 /* GameState.swift */,
+				B10000000000000000000011 /* PrototypeLevel.swift */,
 			);
 			path = Game;
 			sourceTree = "<group>";
@@ -112,6 +119,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000008 /* GameScene.swift */,
+				B10000000000000000000010 /* BunnyNode.swift */,
 			);
 			path = Presentation;
 			sourceTree = "<group>";
@@ -122,6 +130,7 @@
 				B10000000000000000000009 /* MatchEngineTests.swift */,
 				B1000000000000000000000A /* ChainResolverTests.swift */,
 				B1000000000000000000000B /* BoardAndTurnTests.swift */,
+				B10000000000000000000012 /* GamePressureTests.swift */,
 			);
 			path = BunBunTests;
 			sourceTree = "<group>";
@@ -241,6 +250,8 @@
 				A10000000000000000000006 /* ChainResolver.swift in Sources */,
 				A10000000000000000000007 /* GameState.swift in Sources */,
 				A10000000000000000000008 /* GameScene.swift in Sources */,
+				A1000000000000000000000C /* BunnyNode.swift in Sources */,
+				A1000000000000000000000D /* PrototypeLevel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -251,6 +262,7 @@
 				A10000000000000000000009 /* MatchEngineTests.swift in Sources */,
 				A1000000000000000000000A /* ChainResolverTests.swift in Sources */,
 				A1000000000000000000000B /* BoardAndTurnTests.swift in Sources */,
+				A1000000000000000000000E /* GamePressureTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

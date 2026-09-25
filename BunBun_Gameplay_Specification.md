@@ -1,6 +1,6 @@
 # BunBun Gameplay Specification
 
-**Prototype:** 0.1 — Bunny Lab  
+**Prototype:** 0.3 — Pressure and Party Loop
 **Platform:** iPhone  
 **Technology:** Swift + SpriteKit  
 **Gift date:** December 23, 2026  
@@ -174,3 +174,44 @@ The rules layer owns coordinates, placement, matching, clearing, chains, advance
 7. Which control scheme feels most immediately recognizable to Eddie and Beth?
 
 Answers should be recorded here before changing the rules, preserving the line between reconstruction and BunBun design.
+
+## 8. Prototype 0.1 playtest findings
+
+Tested by Eddie on a physical iPhone on September 25, 2026.
+
+- The reconstructed **10 ordinary + 2 outside column** geometry resembles the remembered board.
+- The eight-row depth also appears correct.
+- Shot placement, wrapping behavior, movement toward the pit, and advancement timing all felt plausibly faithful, subject to later comparison with gameplay recordings.
+- The largest visual mismatch is aspect ratio. The remembered game filled a 4:3 television, while a modern iPhone leaves substantially more vertical space around a width-constrained board.
+- Original bunnies were taller than they were wide. Prototype 0.2 should use taller cells and bunny silhouettes so the board occupies more vertical space without changing row or column counts.
+- The old game communicated its rules through constant character motion, celebration, and spectacle. Static placeholders make mechanically correct behavior feel less recognizable.
+- The current prototype is intentionally forgiving near the hazard. A historically accurate loss threshold can wait until movement and feedback make board pressure legible.
+
+### Prototype 0.2 action pass
+
+- Preserve the validated row and column counts.
+- Increase cell height independently of cell width.
+- Replace circles with simple tall bunny-shaped placeholders; this is still temporary art.
+- Animate launched bunnies along their shot paths.
+- Animate match pops, chain labels, column collapse, and Classic advancement.
+- Highlight the selected launcher and the lane being aimed through.
+- Add restart and debug-display controls for rapid play testing.
+- Keep loss disabled while movement and board-pressure behavior are evaluated.
+
+## 9. Prototype 0.3 provisional tuning
+
+Prototype 0.3 activates the first complete play loop. These values are BunBun tuning choices for play testing, not reconstructed historical constants.
+
+- Each cleared bunny adds 4 progress points.
+- Each fallen bunny removes 5 progress points.
+- Each fallen bunny adds 12 danger points, so a single fall is survivable.
+- Each cleared bunny relieves 3 danger points.
+- Reaching 100 progress completes the level.
+- Reaching 100 danger ends the attempt with a gentle “Bunnies need a break” screen.
+- Each cleared bunny charges 14 dance points.
+- At 100 dance points, a four-launch dance party begins and the dance meter rolls over.
+- Clears made while the dance party is active score 2× points.
+- The opening board contains no passive matches and intentionally offers an introductory blue match from the left followed by a green match from the right.
+- Arriving rows contain occasional gaps and continue to spawn only in the 10 ordinary lanes.
+
+Presentation during a dance party uses placeholder dancing, colored lights, confetti, haptics, and a 2× indicator. Final music, choreography, and character animation remain deferred.

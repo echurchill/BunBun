@@ -3,6 +3,8 @@ import Foundation
 struct ChainStage: Equatable, Sendable {
     let depth: Int
     let removedCells: Set<Cell>
+    let boardBefore: Board
+    let boardAfter: Board
 }
 
 struct ChainResolution: Equatable, Sendable {
@@ -30,9 +32,15 @@ struct ChainResolver: Sendable {
 
         while !pending.isEmpty {
             let depth = stages.count + 1
-            stages.append(ChainStage(depth: depth, removedCells: pending))
+            let boardBefore = board
             board.remove(at: pending)
             board.compactTowardHazard()
+            stages.append(ChainStage(
+                depth: depth,
+                removedCells: pending,
+                boardBefore: boardBefore,
+                boardAfter: board
+            ))
             pending = matchEngine.allMatches(on: board).reduce(into: Set<Cell>()) {
                 $0.formUnion($1)
             }

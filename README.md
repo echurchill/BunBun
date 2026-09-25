@@ -1,8 +1,8 @@
 # BunBun
 
-Prototype 0.1 of an original, Boogie Bunnies-inspired birthday game for Beth.
+Prototype 0.3 of an original, Boogie Bunnies-inspired birthday game for Beth.
 
-Open `BunBun.xcodeproj`, select the `BunBun` scheme, and run on an iPhone simulator. The first build uses colored circles and a simple three-sided launcher visualization while the rules are validated.
+Open `BunBun.xcodeproj`, select the `BunBun` scheme, and run on an iPhone or iPhone simulator. Tap a launcher rail, then tap or drag across a lane. This build adds a complete provisional level loop with progress, danger, bunny falls, dance parties, 2× scoring, win/loss states, and animated colored placeholders.
 
 The source is split into:
 

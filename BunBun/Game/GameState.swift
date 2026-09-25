@@ -9,20 +9,40 @@ enum PlayStatus: Equatable, Sendable {
 struct TurnOutcome: Equatable, Sendable {
     let launchResult: LaunchResult
     let chain: ChainResolution?
+    let boardAfterResolution: Board
+    let boardAfterTurn: Board
     let didAdvance: Bool
     let fallenBunnies: [Bunny]
     let pointsAwarded: Int
+    let scoreMultiplier: Int
+    let progressDelta: Int
+    let dangerDelta: Int
+    let dancePartyStarted: Bool
+    let dancePartyEnded: Bool
 }
 
 struct GameState: Equatable, Sendable {
     static let launchesPerClassicAdvance = 3
+    static let maximumMeterValue = 100
+    static let progressPerClearedBunny = 4
+    static let progressLostPerFallenBunny = 5
+    static let dangerPerFallenBunny = 12
+    static let dangerReliefPerClearedBunny = 3
+    static let danceChargePerClearedBunny = 14
+    static let dancePartyLength = 4
 
     private(set) var board: Board
     private(set) var launchesSinceAdvance: Int
     private(set) var score: Int
     private(set) var progress: Int
     private(set) var danceMeter: Int
+    private(set) var danger: Int
+    private(set) var dancePartyTurnsRemaining: Int
     private(set) var status: PlayStatus
+
+    var isDancePartyActive: Bool {
+        dancePartyTurnsRemaining > 0
+    }
 
     init(
         board: Board = Board(),
@@ -30,13 +50,17 @@ struct GameState: Equatable, Sendable {
         score: Int = 0,
         progress: Int = 0,
         danceMeter: Int = 0,
+        danger: Int = 0,
+        dancePartyTurnsRemaining: Int = 0,
         status: PlayStatus = .playing
     ) {
         self.board = board
         self.launchesSinceAdvance = launchesSinceAdvance
         self.score = score
-        self.progress = progress
-        self.danceMeter = danceMeter
+        self.progress = min(max(progress, 0), Self.maximumMeterValue)
+        self.danceMeter = min(max(danceMeter, 0), Self.maximumMeterValue - 1)
+        self.danger = min(max(danger, 0), Self.maximumMeterValue)
+        self.dancePartyTurnsRemaining = max(dancePartyTurnsRemaining, 0)
         self.status = status
     }
 
@@ -47,19 +71,68 @@ struct GameState: Equatable, Sendable {
         newBackRow: [Int: Bunny] = [:],
         resolver: ChainResolver = ChainResolver()
     ) -> TurnOutcome {
+        guard status == .playing else {
+            return TurnOutcome(
+                launchResult: .blocked,
+                chain: nil,
+                boardAfterResolution: board,
+                boardAfterTurn: board,
+                didAdvance: false,
+                fallenBunnies: [],
+                pointsAwarded: 0,
+                scoreMultiplier: isDancePartyActive ? 2 : 1,
+                progressDelta: 0,
+                dangerDelta: 0,
+                dancePartyStarted: false,
+                dancePartyEnded: false
+            )
+        }
+
+        let startingProgress = progress
+        let startingDanger = danger
+        let danceWasActive = isDancePartyActive
+        let multiplier = danceWasActive ? 2 : 1
         let launchResult = board.launch(bunny, from: side, lane: lane)
         var chain: ChainResolution?
         var points = 0
+        var removedCount = 0
+        var dancePartyStarted = false
 
         if case let .placed(cell) = launchResult {
             let resolution = resolver.resolve(board: board, triggeredBy: cell)
             board = resolution.board
             chain = resolution.stages.isEmpty ? nil : resolution
+            removedCount = resolution.removedCount
             points = resolution.stages.reduce(0) { partial, stage in
                 partial + stage.removedCells.count * 100 * stage.depth
-            }
+            } * multiplier
             score += points
         }
+
+        if removedCount > 0 {
+            progress = min(
+                Self.maximumMeterValue,
+                progress + removedCount * Self.progressPerClearedBunny
+            )
+            danger = max(0, danger - removedCount * Self.dangerReliefPerClearedBunny)
+
+            if danceWasActive {
+                // Charge the next party more slowly while the current one is active.
+                danceMeter = min(
+                    Self.maximumMeterValue - 1,
+                    danceMeter + removedCount * (Self.danceChargePerClearedBunny / 2)
+                )
+            } else {
+                danceMeter += removedCount * Self.danceChargePerClearedBunny
+                if danceMeter >= Self.maximumMeterValue {
+                    danceMeter -= Self.maximumMeterValue
+                    dancePartyTurnsRemaining = Self.dancePartyLength
+                    dancePartyStarted = true
+                }
+            }
+        }
+
+        let boardAfterResolution = board
 
         launchesSinceAdvance += 1
         var didAdvance = false
@@ -72,12 +145,39 @@ struct GameState: Equatable, Sendable {
             didAdvance = true
         }
 
+        if !fallen.isEmpty {
+            progress = max(0, progress - fallen.count * Self.progressLostPerFallenBunny)
+            danger = min(
+                Self.maximumMeterValue,
+                danger + fallen.count * Self.dangerPerFallenBunny
+            )
+        }
+
+        var dancePartyEnded = false
+        if danceWasActive {
+            dancePartyTurnsRemaining = max(0, dancePartyTurnsRemaining - 1)
+            dancePartyEnded = dancePartyTurnsRemaining == 0
+        }
+
+        if progress >= Self.maximumMeterValue {
+            status = .won
+        } else if danger >= Self.maximumMeterValue {
+            status = .lost
+        }
+
         return TurnOutcome(
             launchResult: launchResult,
             chain: chain,
+            boardAfterResolution: boardAfterResolution,
+            boardAfterTurn: board,
             didAdvance: didAdvance,
             fallenBunnies: fallen,
-            pointsAwarded: points
+            pointsAwarded: points,
+            scoreMultiplier: multiplier,
+            progressDelta: progress - startingProgress,
+            dangerDelta: danger - startingDanger,
+            dancePartyStarted: dancePartyStarted,
+            dancePartyEnded: dancePartyEnded
         )
     }
 }
