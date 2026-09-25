@@ -31,6 +31,10 @@
 		A10000000000000000000016 /* BunnyRescueSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* BunnyRescueSheet.png */; };
 		A10000000000000000000017 /* BunnyDanceTwoStepSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* BunnyDanceTwoStepSheet.png */; };
 		A10000000000000000000018 /* BunnyDanceHopSheet.png in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* BunnyDanceHopSheet.png */; };
+		A10000000000000000000019 /* LevelDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001D /* LevelDefinition.swift */; };
+		A1000000000000000000001A /* CampaignState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001E /* CampaignState.swift */; };
+		A1000000000000000000001B /* CampaignPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001F /* CampaignPersistence.swift */; };
+		A1000000000000000000001C /* CampaignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* CampaignTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +76,10 @@
 		B1000000000000000000001A /* BunnyRescueSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyRescueSheet.png; sourceTree = "<group>"; };
 		B1000000000000000000001B /* BunnyDanceTwoStepSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyDanceTwoStepSheet.png; sourceTree = "<group>"; };
 		B1000000000000000000001C /* BunnyDanceHopSheet.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BunnyDanceHopSheet.png; sourceTree = "<group>"; };
+		B1000000000000000000001D /* LevelDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelDefinition.swift; sourceTree = "<group>"; };
+		B1000000000000000000001E /* CampaignState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampaignState.swift; sourceTree = "<group>"; };
+		B1000000000000000000001F /* CampaignPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampaignPersistence.swift; sourceTree = "<group>"; };
+		B10000000000000000000020 /* CampaignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampaignTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -119,6 +127,7 @@
 			children = (
 				B10000000000000000000001 /* BunBunApp.swift */,
 				B10000000000000000000002 /* ContentView.swift */,
+				B1000000000000000000001F /* CampaignPersistence.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -132,6 +141,8 @@
 				B10000000000000000000006 /* ChainResolver.swift */,
 				B10000000000000000000007 /* GameState.swift */,
 				B10000000000000000000011 /* PrototypeLevel.swift */,
+				B1000000000000000000001D /* LevelDefinition.swift */,
+				B1000000000000000000001E /* CampaignState.swift */,
 			);
 			path = Game;
 			sourceTree = "<group>";
@@ -152,6 +163,7 @@
 				B1000000000000000000000A /* ChainResolverTests.swift */,
 				B1000000000000000000000B /* BoardAndTurnTests.swift */,
 				B10000000000000000000012 /* GamePressureTests.swift */,
+				B10000000000000000000020 /* CampaignTests.swift */,
 			);
 			path = BunBunTests;
 			sourceTree = "<group>";
@@ -300,6 +312,9 @@
 				A10000000000000000000008 /* GameScene.swift in Sources */,
 				A1000000000000000000000C /* BunnyNode.swift in Sources */,
 				A1000000000000000000000D /* PrototypeLevel.swift in Sources */,
+				A10000000000000000000019 /* LevelDefinition.swift in Sources */,
+				A1000000000000000000001A /* CampaignState.swift in Sources */,
+				A1000000000000000000001B /* CampaignPersistence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,6 +326,7 @@
 				A1000000000000000000000A /* ChainResolverTests.swift in Sources */,
 				A1000000000000000000000B /* BoardAndTurnTests.swift in Sources */,
 				A1000000000000000000000E /* GamePressureTests.swift in Sources */,
+				A1000000000000000000001C /* CampaignTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -374,13 +390,13 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.puzzle-games";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.eddie.BunBun;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -396,13 +412,13 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.puzzle-games";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.eddie.BunBun;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};

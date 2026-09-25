@@ -1,7 +1,7 @@
 # BunBun Gameplay Specification
 
-**Prototype:** 0.4 — Special Bunnies and Level Tuning
-**Platform:** iPhone  
+**Prototype:** 0.5 — Levels and Campaign Foundation
+**Platform:** iPhone and iPad
 **Technology:** Swift + SpriteKit  
 **Gift date:** December 23, 2026  
 **Project name:** BunBun (working title)
@@ -288,3 +288,39 @@ The blue bunny concept is now used as real prototype presentation art while rema
 - Special-bunny badges and effects remain presentation overlays, keeping the same character animation reusable for normal, bomb, and line bunnies.
 
 These sprite sheets are prototype assets, not a commitment to the final 2D/3D rendering approach described in the art and animation research.
+
+## 11. Prototype 0.5 campaign foundation
+
+Prototype 0.5 turns the single hard-coded board into a small, replayable campaign while preserving the pure Swift rules and the validated three-sided controls.
+
+### Data-driven levels
+
+- `LevelDefinition` owns the starting layout, supplied shots, deterministic arrival pattern, tutorial prompts, theme identifier, and gameplay tuning.
+- `GameState` consumes a level's `GameRules`; matching, chaining, board geometry, and special behavior remain shared.
+- **Bunny Lab** preserves the Prototype 0.4 opening and forgiving tuning.
+- **Moonlight Meadow** removes explicit tutorials, uses denser arrivals, and increases pressure around special-bunny planning.
+- **Dance Rehearsal** advances every two launches, charges dance parties faster, supplies more special combinations, and uses a lower progress target for a shorter high-energy finale.
+- Every starting board is automatically verified to contain no passive match.
+
+### Campaign and navigation
+
+- Only Bunny Lab is initially unlocked.
+- Winning records completion, preserves the best score, and unlocks exactly the next level.
+- Campaign state is Codable and saved through a protocol-based persistence boundary backed by `UserDefaults`.
+- Missing or corrupt save data safely returns to a new campaign.
+- The level picker shows locks, completed levels, and best scores, with reset progress behind confirmation.
+- Win flow offers Next Level, Replay, and Levels; loss flow offers Retry and Levels.
+
+### iPhone and iPad presentation
+
+- Both iPhone and iPad are native target families.
+- The level picker uses a readable maximum content width on large screens rather than stretching cards across the display.
+- SpriteKit calculates phone and tablet board sizes separately; iPad receives larger cells, bunnies, meters, labels, hit regions, and end panels.
+- Portrait and landscape keep the complete board, hazard, meters, next-bunny display, and invisible bottom launch region visible.
+- Simulator QA covered the iPhone level picker, iPad level picker in portrait and landscape, iPad gameplay in portrait and landscape, and a successful direct side-box match in landscape.
+- Physical iPad playtesting remains required for final comfort, reach, and text-size tuning.
+
+### Prototype 0.5 automated coverage
+
+- All previous matching, chain, geometry, pressure, special, and turn tests remain active.
+- New tests verify level validity, match-free starts, level-specific rules, deterministic arrivals, sequential unlocks, loss behavior, best-score replacement, final-level bounds, Codable round-tripping, persistence reset, and corrupt-save recovery.

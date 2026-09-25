@@ -2,7 +2,7 @@
 
 **Working milestone:** Levels and Campaign Foundation  
 **Depends on:** Prototype 0.4 special-bunny and tuned single-level loop  
-**Status:** Planned; not yet implemented
+**Status:** Implemented in the prototype; physical-device campaign tuning remains
 
 ## Goal
 
@@ -165,6 +165,20 @@ Prototype 0.5 is complete when:
 - All rules and campaign tests pass.
 - The game still builds without changing or clearing the configured Apple development team.
 - The gameplay specification records physical-device findings and any tuning changes.
+
+## Implementation record — September 25, 2026
+
+- Added pure Swift `LevelDefinition`, `GameRules`, `CampaignState`, and deterministic arrival patterns.
+- Migrated Bunny Lab without changing its opening sequence or Prototype 0.4 tuning.
+- Added Moonlight Meadow and Dance Rehearsal with distinct boards, supplied shots, arrival density, pressure, progress, and dance values.
+- Added protocol-based campaign persistence, safe corrupt-data fallback, unlocks, completion, and best scores.
+- Added a native SwiftUI level picker plus Next Level, Replay, Retry, Levels, and confirmed reset flows.
+- Added separate placeholder color treatments and short level-introduction transitions.
+- Added native iPad support, responsive tablet board/HUD sizing, and constrained large-screen menu width.
+- Verified the level picker and gameplay on iPhone and on a 13-inch iPad simulator in portrait and landscape. A direct side-box match succeeded in iPad landscape.
+- Expanded the suite from 21 to 28 passing tests.
+
+The remaining completion gate is hands-on playtesting of all three levels on physical iPhone and iPad hardware, followed by tuning from the recorded launch counts, falls, specials, and dance parties.
 
 ## Recommended implementation order
 

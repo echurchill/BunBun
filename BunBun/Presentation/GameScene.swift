@@ -7,13 +7,20 @@ final class GameScene: SKScene {
         let lane: Int
     }
 
-    private var state = GameState(board: PrototypeLevel.startingBoard())
-    private var currentColorIndex = 0
+    private let level: LevelDefinition
+    private let hasNextLevel: Bool
+    private let onLevelCompleted: (LevelID, Int) -> Void
+    private let onRequestLevels: () -> Void
+    private let onRequestNextLevel: () -> Void
+
+    private var state: GameState
+    private var currentShotIndex = 0
     private var selectedSide: LaunchSide = .bottom
     private var highlightedLane: Int?
     private var isAnimating = false
     private var showsDebug = false
     private var showsDanceParty = false
+    private var didReportCompletion = false
 
     private let partyLayer = SKNode()
     private let gridLayer = SKNode()
@@ -25,8 +32,37 @@ final class GameScene: SKScene {
     private var cellWidth: CGFloat = 24
     private var cellHeight: CGFloat = 34
 
+    private var isTabletLayout: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    private var hudScale: CGFloat {
+        isTabletLayout ? 1.22 : 1
+    }
+
+    init(
+        size: CGSize,
+        level: LevelDefinition = LevelCatalog.bunnyLab,
+        hasNextLevel: Bool = false,
+        onLevelCompleted: @escaping (LevelID, Int) -> Void = { _, _ in },
+        onRequestLevels: @escaping () -> Void = {},
+        onRequestNextLevel: @escaping () -> Void = {}
+    ) {
+        self.level = level
+        self.hasNextLevel = hasNextLevel
+        self.onLevelCompleted = onLevelCompleted
+        self.onRequestLevels = onRequestLevels
+        self.onRequestNextLevel = onRequestNextLevel
+        state = GameState(board: level.startingBoard(), rules: level.rules)
+        super.init(size: size)
+    }
+
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override func didMove(to view: SKView) {
-        backgroundColor = SKColor(red: 0.06, green: 0.08, blue: 0.14, alpha: 1)
+        backgroundColor = themeBackgroundColor
         addChild(partyLayer)
         addChild(gridLayer)
         addChild(bunnyLayer)
@@ -63,6 +99,9 @@ final class GameScene: SKScene {
             highlightedLane = nil
             switch control {
             case "restart": resetGame()
+            case "replay": resetGame()
+            case "levels": onRequestLevels()
+            case "next": onRequestNextLevel()
             case "debug":
                 showsDebug.toggle()
                 renderAll()
@@ -88,9 +127,9 @@ final class GameScene: SKScene {
     }
 
     private func performLaunch(lane: Int) {
-        let shot = PrototypeLevel.shot(at: currentColorIndex)
+        let shot = level.shot(at: currentShotIndex)
         let bunny = shot.makeBunny()
-        let newRow = PrototypeLevel.advanceRow(forTurn: currentColorIndex)
+        let newRow = level.advanceRow(forTurn: currentShotIndex)
 
         let outcome = state.launch(
             bunny,
@@ -98,7 +137,7 @@ final class GameScene: SKScene {
             lane: lane,
             newBackRow: newRow
         )
-        currentColorIndex += 1
+        currentShotIndex += 1
         highlightedLane = nil
         isAnimating = true
         drawGrid()
@@ -347,12 +386,20 @@ final class GameScene: SKScene {
     }
 
     private func layoutBoard() {
-        let horizontalPadding: CGFloat = 10
-        cellWidth = min(31, (size.width - horizontalPadding * 2) / CGFloat(state.board.columnCount))
-        cellHeight = min(cellWidth * 1.47, (size.height * 0.52) / CGFloat(state.board.rowCount))
+        let horizontalPadding: CGFloat = isTabletLayout ? max(54, size.width * 0.08) : 10
+        let maximumCellWidth: CGFloat = isTabletLayout ? 64 : 31
+        let boardHeightFraction: CGFloat = isTabletLayout ? 0.60 : 0.52
+        cellWidth = min(
+            maximumCellWidth,
+            (size.width - horizontalPadding * 2) / CGFloat(state.board.columnCount)
+        )
+        cellHeight = min(
+            cellWidth * 1.47,
+            (size.height * boardHeightFraction) / CGFloat(state.board.rowCount)
+        )
         boardOrigin = CGPoint(
             x: (size.width - boardWidth) / 2,
-            y: (size.height - boardHeight) / 2 - 6
+            y: (size.height - boardHeight) / 2 - (isTabletLayout ? 10 : 6)
         )
     }
 
@@ -430,47 +477,54 @@ final class GameScene: SKScene {
         hudLayer.removeAllChildren()
 
         let title = SKLabelNode(fontNamed: "AvenirNext-Heavy")
-        title.text = "BUNBUN  •  BUNNY LAB 0.4"
-        title.fontSize = 19
+        title.text = "BUNBUN  •  \(level.displayName.uppercased()) 0.5"
+        title.fontSize = (level.displayName.count > 14 ? 16 : 19) * hudScale
         title.fontColor = .white
         title.position = CGPoint(x: size.width / 2, y: size.height - 82)
         hudLayer.addChild(title)
 
         let subtitle = SKLabelNode(fontNamed: "AvenirNext-Medium")
-        switch currentColorIndex {
-        case 0:
-            subtitle.text = "Tap the LEFT purple box beside the blue pair"
-        case 1:
-            subtitle.text = "Tap the RIGHT purple box beside the green pair"
-        case 2:
-            subtitle.text = "BOMB: tap LEFT beside the red pair"
-        case 3:
-            subtitle.text = "LINE: tap RIGHT beside the purple pair"
-        default:
-            subtitle.text = "Tap a side box or touch below a column"
-        }
-        subtitle.fontSize = 12
+        subtitle.text = level.prompt(at: currentShotIndex)
+        subtitle.fontSize = 12 * hudScale
         subtitle.fontColor = SKColor(white: 0.72, alpha: 1)
         subtitle.position = CGPoint(x: size.width / 2, y: title.position.y - 24)
         hudLayer.addChild(subtitle)
 
-        addControl(name: "debug", text: showsDebug ? "DEBUG ON" : "DEBUG", x: 58)
-        addControl(name: "restart", text: "RESTART", x: size.width - 58)
+        let controlInset: CGFloat = isTabletLayout ? 90 : 58
+        addControl(name: "debug", text: showsDebug ? "DEBUG ON" : "DEBUG", x: controlInset)
+        addControl(name: "restart", text: "RESTART", x: size.width - controlInset)
 
-        let meterWidth = min(92, (size.width - 48) / 3)
+        let meterWidth = min(isTabletLayout ? 150 : 92, (size.width - 48) / 3)
         let meterY = size.height - 166
-        addMeter(title: "PROGRESS", value: state.progress, color: .systemGreen, x: size.width * 0.22, y: meterY, width: meterWidth)
+        addMeter(
+            title: "PROGRESS",
+            value: state.progress,
+            maximumValue: state.rules.progressTarget,
+            color: .systemGreen,
+            x: size.width * 0.22,
+            y: meterY,
+            width: meterWidth
+        )
         addMeter(
             title: state.isDancePartyActive ? "DANCE ×2 (\(state.dancePartyTurnsRemaining))" : "DANCE",
             value: state.danceMeter,
+            maximumValue: state.rules.danceTarget,
             color: state.isDancePartyActive ? .systemYellow : .systemPurple,
             x: size.width * 0.50,
             y: meterY,
             width: meterWidth
         )
-        addMeter(title: "DANGER", value: state.danger, color: .systemRed, x: size.width * 0.78, y: meterY, width: meterWidth)
+        addMeter(
+            title: "DANGER",
+            value: state.danger,
+            maximumValue: state.rules.dangerLimit,
+            color: .systemRed,
+            x: size.width * 0.78,
+            y: meterY,
+            width: meterWidth
+        )
 
-        let shot = PrototypeLevel.shot(at: currentColorIndex)
+        let shot = level.shot(at: currentShotIndex)
         let previewBunny = shot.makeBunny()
         let preview = BunnyNode(
             bunny: previewBunny,
@@ -478,8 +532,9 @@ final class GameScene: SKScene {
             cellHeight: 31,
             color: spriteColor(for: shot.color)
         )
-        preview.position = CGPoint(x: size.width / 2 - 75, y: 69)
-        preview.setScale(0.82)
+        let previewY = isTabletLayout ? max(72, boardOrigin.y - cellHeight * 1.6) : 69
+        preview.position = CGPoint(x: size.width / 2 - (isTabletLayout ? 95 : 75), y: previewY)
+        preview.setScale(isTabletLayout ? 1.05 : 0.82)
         hudLayer.addChild(preview)
 
         let label = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
@@ -489,8 +544,8 @@ final class GameScene: SKScene {
         case .redBomb: "Next BOMB"
         case .lineClear: "Next LINE"
         }
-        label.text = "\(nextName)   •   Score \(state.score)   •   Hop in \(3 - state.launchesSinceAdvance)\(multiplier)"
-        label.fontSize = 12
+        label.text = "\(nextName)   •   Score \(state.score)   •   Hop in \(state.rules.launchesPerAdvance - state.launchesSinceAdvance)\(multiplier)"
+        label.fontSize = 12 * hudScale
         label.fontColor = .white
         label.horizontalAlignmentMode = .left
         label.verticalAlignmentMode = .center
@@ -500,7 +555,7 @@ final class GameScene: SKScene {
         if showsDebug {
             let debug = SKLabelNode(fontNamed: "Menlo")
             debug.text = "side=\(selectedSide.rawValue)  occupied=\(state.board.occupants.count)  state=\(state.status)"
-            debug.fontSize = 9
+            debug.fontSize = 9 * hudScale
             debug.fontColor = .systemGreen
             debug.position = CGPoint(x: size.width / 2, y: 38)
             hudLayer.addChild(debug)
@@ -511,16 +566,24 @@ final class GameScene: SKScene {
         let node = SKLabelNode(fontNamed: "AvenirNext-Bold")
         node.name = "control:\(name)"
         node.text = text
-        node.fontSize = 10
+        node.fontSize = 10 * hudScale
         node.fontColor = SKColor(white: 0.70, alpha: 1)
         node.position = CGPoint(x: x, y: size.height - 132)
         hudLayer.addChild(node)
     }
 
-    private func addMeter(title: String, value: Int, color: SKColor, x: CGFloat, y: CGFloat, width: CGFloat) {
+    private func addMeter(
+        title: String,
+        value: Int,
+        maximumValue: Int,
+        color: SKColor,
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat
+    ) {
         let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
         label.text = title
-        label.fontSize = 8
+        label.fontSize = 8 * hudScale
         label.fontColor = SKColor(white: 0.72, alpha: 1)
         label.position = CGPoint(x: x, y: y + 9)
         hudLayer.addChild(label)
@@ -532,7 +595,7 @@ final class GameScene: SKScene {
         track.lineWidth = 1
         hudLayer.addChild(track)
 
-        let fillWidth = max(0, width * CGFloat(value) / CGFloat(GameState.maximumMeterValue))
+        let fillWidth = max(0, width * CGFloat(value) / CGFloat(max(maximumValue, 1)))
         guard fillWidth > 0 else { return }
         let fill = SKShapeNode(rectOf: CGSize(width: fillWidth, height: 5), cornerRadius: 2.5)
         fill.position = CGPoint(x: x - width / 2 + fillWidth / 2, y: y - 2)
@@ -576,7 +639,7 @@ final class GameScene: SKScene {
     private func launchTarget(at point: CGPoint) -> LaunchTarget? {
         let row = Int(((point.y - boardOrigin.y) / cellHeight).rounded(.down))
         let isWithinBoardHeight = row >= 0 && row < state.board.rowCount
-        let sideHitSlop: CGFloat = 12
+        let sideHitSlop = max(12, cellWidth * 0.25)
 
         if isWithinBoardHeight,
            point.x >= boardOrigin.x - sideHitSlop,
@@ -626,6 +689,16 @@ final class GameScene: SKScene {
         for node in hudLayer.children where node.name?.hasPrefix("control:") == true {
             if node.frame.insetBy(dx: -14, dy: -12).contains(point) {
                 return node.name?.replacingOccurrences(of: "control:", with: "")
+            }
+        }
+
+        for hitNode in nodes(at: point) {
+            var node: SKNode? = hitNode
+            while let candidate = node, candidate !== self {
+                if let name = candidate.name, name.hasPrefix("control:") {
+                    return name.replacingOccurrences(of: "control:", with: "")
+                }
+                node = candidate.parent
             }
         }
         return nil
@@ -753,7 +826,7 @@ final class GameScene: SKScene {
         } else if outcome.dancePartyEnded {
             showsDanceParty = false
             partyLayer.removeAllChildren()
-            backgroundColor = SKColor(red: 0.06, green: 0.08, blue: 0.14, alpha: 1)
+            backgroundColor = themeBackgroundColor
         }
     }
 
@@ -781,7 +854,11 @@ final class GameScene: SKScene {
 
     private func showEndStateIfNeeded() {
         guard state.status != .playing else { return }
-        let panel = SKShapeNode(rectOf: CGSize(width: min(310, size.width - 50), height: 112), cornerRadius: 18)
+        let panelHeight: CGFloat = state.status == .won ? 176 : 154
+        let panel = SKShapeNode(
+            rectOf: CGSize(width: min(isTabletLayout ? 420 : 330, size.width - 38), height: panelHeight),
+            cornerRadius: 18
+        )
         panel.fillColor = SKColor(white: 0.05, alpha: 0.92)
         panel.strokeColor = state.status == .won ? .systemGreen : .systemPink
         panel.lineWidth = 3
@@ -794,20 +871,50 @@ final class GameScene: SKScene {
         title.fontSize = state.status == .won ? 23 : 18
         title.fontColor = .white
         title.verticalAlignmentMode = .center
-        title.position.y = 15
+        title.position.y = panelHeight / 2 - 35
         panel.addChild(title)
 
         let prompt = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
-        prompt.text = "Tap RESTART to play again"
+        prompt.text = state.status == .won ? "Score \(state.score)" : "The bunnies are ready to try again"
         prompt.fontSize = 12
         prompt.fontColor = SKColor(white: 0.75, alpha: 1)
         prompt.verticalAlignmentMode = .center
-        prompt.position.y = -22
+        prompt.position.y = panelHeight / 2 - 64
         panel.addChild(prompt)
 
         if state.status == .won {
+            if hasNextLevel {
+                addEndButton(to: panel, name: "next", text: "NEXT LEVEL", y: 4)
+            }
+            addEndButton(to: panel, name: "replay", text: "REPLAY", y: hasNextLevel ? -35 : -7)
+            addEndButton(to: panel, name: "levels", text: "LEVELS", y: hasNextLevel ? -70 : -48)
             addConfetti(for: 5)
+            if !didReportCompletion {
+                didReportCompletion = true
+                onLevelCompleted(level.id, state.score)
+            }
+        } else {
+            addEndButton(to: panel, name: "replay", text: "RETRY", y: -1)
+            addEndButton(to: panel, name: "levels", text: "LEVELS", y: -43)
         }
+    }
+
+    private func addEndButton(to panel: SKNode, name: String, text: String, y: CGFloat) {
+        let button = SKShapeNode(rectOf: CGSize(width: 174, height: 31), cornerRadius: 10)
+        button.name = "control:\(name)"
+        button.position.y = y
+        button.fillColor = name == "next" ? .systemGreen : SKColor(white: 0.18, alpha: 1)
+        button.strokeColor = name == "next" ? .white : SKColor(white: 0.46, alpha: 1)
+        button.lineWidth = name == "next" ? 2 : 1
+        panel.addChild(button)
+
+        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        label.name = button.name
+        label.text = text
+        label.fontSize = 12
+        label.fontColor = .white
+        label.verticalAlignmentMode = .center
+        button.addChild(label)
     }
 
     private func flashMessage(_ text: String, color: SKColor) {
@@ -864,14 +971,15 @@ final class GameScene: SKScene {
     private func resetGame() {
         removeAllActions()
         effectLayer.removeAllChildren()
-        state = GameState(board: PrototypeLevel.startingBoard())
-        currentColorIndex = 0
+        state = GameState(board: level.startingBoard(), rules: level.rules)
+        currentShotIndex = 0
         selectedSide = .bottom
         highlightedLane = nil
         isAnimating = false
         showsDanceParty = false
+        didReportCompletion = false
         partyLayer.removeAllChildren()
-        backgroundColor = SKColor(red: 0.06, green: 0.08, blue: 0.14, alpha: 1)
+        backgroundColor = themeBackgroundColor
         renderAll()
         flashMessage("READY!", color: .systemGreen)
     }
@@ -887,4 +995,14 @@ final class GameScene: SKScene {
         }
     }
 
+    private var themeBackgroundColor: SKColor {
+        switch level.theme {
+        case .lab:
+            SKColor(red: 0.06, green: 0.08, blue: 0.14, alpha: 1)
+        case .meadow:
+            SKColor(red: 0.025, green: 0.105, blue: 0.105, alpha: 1)
+        case .rehearsal:
+            SKColor(red: 0.105, green: 0.035, blue: 0.14, alpha: 1)
+        }
+    }
 }
