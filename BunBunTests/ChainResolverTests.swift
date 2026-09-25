@@ -5,14 +5,14 @@ final class ChainResolverTests: XCTestCase {
     func testCompactionCreatesSecondChainStage() {
         var board = Board()
 
-        for column in 2...4 {
-            XCTAssertTrue(board.place(Bunny(color: .pink), at: Cell(column: column, row: 0)))
-            XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: column, row: 1)))
+        for (column, blueRow) in zip(2...4, [1, 3, 5]) {
+            XCTAssertTrue(board.place(Bunny(color: .pink), at: Cell(column: column, row: 6)))
+            XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: column, row: blueRow)))
         }
 
         let result = ChainResolver().resolve(
             board: board,
-            triggeredBy: Cell(column: 3, row: 0)
+            triggeredBy: Cell(column: 3, row: 6)
         )
 
         XCTAssertEqual(result.stages.count, 2)
@@ -24,6 +24,23 @@ final class ChainResolverTests: XCTestCase {
         XCTAssertEqual(result.stages[1].removedCells.count, 3)
         XCTAssertEqual(result.removedCount, 6)
         XCTAssertTrue(result.board.occupiedCells.isEmpty)
+    }
+
+    func testSuccessfulClearCompactsSurvivorsAwayFromHazard() {
+        var board = Board()
+        for column in 2...4 {
+            XCTAssertTrue(board.place(Bunny(color: .pink), at: Cell(column: column, row: 4)))
+        }
+        let survivor = Bunny(color: .blue)
+        XCTAssertTrue(board.place(survivor, at: Cell(column: 2, row: 2)))
+
+        let result = ChainResolver().resolve(
+            board: board,
+            triggeredBy: Cell(column: 3, row: 4)
+        )
+
+        XCTAssertEqual(result.board[Cell(column: 2, row: 7)], survivor)
+        XCTAssertNil(result.board[Cell(column: 2, row: 0)])
     }
 
     func testUnrelatedExistingMatchDoesNotStartWithoutTriggeredMatch() {
@@ -63,7 +80,7 @@ final class ChainResolverTests: XCTestCase {
         XCTAssertTrue(result.stages[0].removedCells.contains(nearby))
         XCTAssertEqual(result.stages[0].specialActivations.map(\.kind), [.redBomb])
         XCTAssertEqual(result.specialEffectRemovedCount, 1)
-        XCTAssertNotNil(result.board[Cell(column: farAway.column, row: 0)])
+        XCTAssertNotNil(result.board[Cell(column: farAway.column, row: 7)])
     }
 
     func testMatchedLineBunnyClearsItsRowAndColumn() {
@@ -87,7 +104,7 @@ final class ChainResolverTests: XCTestCase {
         XCTAssertTrue(result.stages[0].removedCells.isSuperset(of: Set([sameRow, sameColumn])))
         XCTAssertEqual(result.stages[0].specialActivations.map(\.kind), [.lineClear])
         XCTAssertEqual(result.specialEffectRemovedCount, 2)
-        XCTAssertNotNil(result.board[Cell(column: untouched.column, row: 0)])
+        XCTAssertNotNil(result.board[Cell(column: untouched.column, row: 7)])
     }
 
     func testSpecialCaughtByBombActivatesInSameStage() {

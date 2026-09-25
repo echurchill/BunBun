@@ -12,20 +12,24 @@ final class GamePressureTests: XCTestCase {
         XCTAssertEqual(outcome.chain?.removedCount, 3)
         XCTAssertEqual(state.progress, 9)
         XCTAssertEqual(state.danceMeter, 42)
+        XCTAssertTrue(
+            outcome.boardAfterResolution.occupiedCells.allSatisfy { $0.row >= 4 },
+            "A successful opening match must not pull the formation toward the hazard"
+        )
     }
 
     func testOpeningSequenceIntroducesBothSpecialBunnies() {
         var state = GameState(board: PrototypeLevel.startingBoard())
 
         let blue = state.launch(PrototypeLevel.shot(at: 0).makeBunny(), from: .left, lane: 5)
-        let green = state.launch(PrototypeLevel.shot(at: 1).makeBunny(), from: .right, lane: 2)
+        let green = state.launch(PrototypeLevel.shot(at: 1).makeBunny(), from: .right, lane: 6)
         let bomb = state.launch(
             PrototypeLevel.shot(at: 2).makeBunny(),
             from: .left,
-            lane: 0,
+            lane: 5,
             newBackRow: PrototypeLevel.advanceRow(forTurn: 2)
         )
-        let line = state.launch(PrototypeLevel.shot(at: 3).makeBunny(), from: .right, lane: 1)
+        let line = state.launch(PrototypeLevel.shot(at: 3).makeBunny(), from: .right, lane: 6)
 
         XCTAssertEqual(blue.chain?.matchedCount, 3)
         XCTAssertEqual(green.chain?.matchedCount, 3)
@@ -49,7 +53,7 @@ final class GamePressureTests: XCTestCase {
         XCTAssertTrue(state.isDancePartyActive)
         XCTAssertEqual(state.dancePartyTurnsRemaining, 4)
 
-        let danceMatch = state.launch(Bunny(color: .green), from: .left, lane: 0)
+        let danceMatch = state.launch(Bunny(color: .green), from: .left, lane: 7)
         XCTAssertEqual(danceMatch.scoreMultiplier, 2)
         XCTAssertEqual(danceMatch.pointsAwarded, 600)
         XCTAssertEqual(state.dancePartyTurnsRemaining, 3)

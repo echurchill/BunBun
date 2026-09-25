@@ -55,7 +55,7 @@ struct ChainResolver: Sendable {
             let boardBefore = board
             let expansion = expandedRemoval(startingWith: pending, on: board)
             board.remove(at: expansion.cells)
-            board.compactTowardHazard()
+            board.compactAwayFromHazard()
             stages.append(ChainStage(
                 depth: depth,
                 matchedCells: pending,

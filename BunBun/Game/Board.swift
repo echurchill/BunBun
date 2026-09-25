@@ -91,7 +91,10 @@ struct Board: Equatable, Sendable {
         return .placed(target)
     }
 
-    mutating func compactTowardHazard() {
+    /// Closes holes after a successful clear by packing each column against
+    /// the back/arrival edge. Clearing bunnies therefore creates space near
+    /// the hazard; only Classic advancement moves the formation toward danger.
+    mutating func compactAwayFromHazard() {
         for column in 0..<columnCount {
             let bunnies = occupants
                 .filter { $0.key.column == column }
@@ -99,7 +102,9 @@ struct Board: Equatable, Sendable {
                 .map(\.value)
 
             occupants = occupants.filter { $0.key.column != column }
-            for (row, bunny) in bunnies.enumerated() {
+            let firstRow = rowCount - bunnies.count
+            for (offset, bunny) in bunnies.enumerated() {
+                let row = firstRow + offset
                 occupants[Cell(column: column, row: row)] = bunny
             }
         }
