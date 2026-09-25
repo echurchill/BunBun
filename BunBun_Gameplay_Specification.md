@@ -120,7 +120,8 @@ Prototype 0.4 initially packed cleared columns toward row 0. Physical-device pla
 These are intentional modernizations rather than reconstructions.
 
 - Touch-first aiming with a clearly highlighted lane.
-- Two control experiments: direct lane tapping and drag/flick from a launcher rail.
+- Direct edge controls: the visible purple cells on the left and right launch through their rows, while an invisible row below the board launches up its columns.
+- No permanent direction arrows; touching or dragging across an edge target temporarily reveals the intended lane.
 - Optional next-bunny preview if hidden colors feel unfair on a phone.
 - Precise visual targeting; do not reproduce the original controller's aiming ambiguity.
 - Single-player first. A later “Eddie + Beth” cooperative mode should be designed for shared iPad play or nearby devices rather than copying the old shared-rail restriction.
@@ -200,7 +201,7 @@ Tested by Eddie on a physical iPhone on September 25, 2026.
 - Replace circles with simple tall bunny-shaped placeholders; this is still temporary art.
 - Animate launched bunnies along their shot paths.
 - Animate match pops, chain labels, column collapse, and Classic advancement.
-- Highlight the selected launcher and the lane being aimed through.
+- Highlight the lane being aimed through without permanent arrow controls.
 - Add restart and debug-display controls for rapid play testing.
 - Keep loss disabled while movement and board-pressure behavior are evaluated.
 

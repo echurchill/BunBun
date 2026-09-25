@@ -2,6 +2,11 @@ import SpriteKit
 import UIKit
 
 final class GameScene: SKScene {
+    private struct LaunchTarget {
+        let side: LaunchSide
+        let lane: Int
+    }
+
     private var state = GameState(board: PrototypeLevel.startingBoard())
     private var currentColorIndex = 0
     private var selectedSide: LaunchSide = .bottom
@@ -66,16 +71,10 @@ final class GameScene: SKScene {
             return
         }
 
-        if let side = launcherSide(at: point) {
-            selectedSide = side
-            highlightedLane = nil
-            renderAll()
-            return
-        }
-
-        guard let cell = boardCell(at: point) else {
+        guard let target = launchTarget(at: point) else {
             highlightedLane = nil
             drawGrid()
+            updateAimReactions()
             return
         }
 
@@ -84,8 +83,8 @@ final class GameScene: SKScene {
             return
         }
 
-        let lane = selectedSide == .bottom ? cell.column : cell.row
-        performLaunch(lane: lane)
+        selectedSide = target.side
+        performLaunch(lane: target.lane)
     }
 
     private func performLaunch(lane: Int) {
@@ -122,7 +121,7 @@ final class GameScene: SKScene {
         result: LaunchResult,
         completion: @escaping () -> Void
     ) {
-        let start = launcherPosition(for: side)
+        let start = projectileStartPosition(for: side, lane: lane)
         let end: CGPoint
 
         switch result {
@@ -136,7 +135,7 @@ final class GameScene: SKScene {
             )
         case .blocked:
             flashMessage("BLOCKED", color: .systemOrange)
-            shakeLauncher(side)
+            pulseLaunchTarget(side: side, lane: lane)
             run(.sequence([.wait(forDuration: 0.22), .run(completion)]))
             return
         }
@@ -348,9 +347,9 @@ final class GameScene: SKScene {
     }
 
     private func layoutBoard() {
-        let horizontalPadding: CGFloat = 42
-        cellWidth = min(30, (size.width - horizontalPadding * 2) / CGFloat(state.board.columnCount))
-        cellHeight = min(cellWidth * 1.43, (size.height * 0.50) / CGFloat(state.board.rowCount))
+        let horizontalPadding: CGFloat = 10
+        cellWidth = min(31, (size.width - horizontalPadding * 2) / CGFloat(state.board.columnCount))
+        cellHeight = min(cellWidth * 1.47, (size.height * 0.52) / CGFloat(state.board.rowCount))
         boardOrigin = CGPoint(
             x: (size.width - boardWidth) / 2,
             y: (size.height - boardHeight) / 2 - 6
@@ -440,15 +439,15 @@ final class GameScene: SKScene {
         let subtitle = SKLabelNode(fontNamed: "AvenirNext-Medium")
         switch currentColorIndex {
         case 0:
-            subtitle.text = "Try LEFT on the row with the blue pair"
+            subtitle.text = "Tap the LEFT purple box beside the blue pair"
         case 1:
-            subtitle.text = "Now try RIGHT on the row with the green pair"
+            subtitle.text = "Tap the RIGHT purple box beside the green pair"
         case 2:
-            subtitle.text = "BOMB: try LEFT on the red pair"
+            subtitle.text = "BOMB: tap LEFT beside the red pair"
         case 3:
-            subtitle.text = "LINE: try RIGHT on the purple pair"
+            subtitle.text = "LINE: tap RIGHT beside the purple pair"
         default:
-            subtitle.text = "Tap a rail, then tap or drag to a lane"
+            subtitle.text = "Tap a side box or touch below a column"
         }
         subtitle.fontSize = 12
         subtitle.fontColor = SKColor(white: 0.72, alpha: 1)
@@ -470,10 +469,6 @@ final class GameScene: SKScene {
             width: meterWidth
         )
         addMeter(title: "DANGER", value: state.danger, color: .systemRed, x: size.width * 0.78, y: meterY, width: meterWidth)
-
-        for side in LaunchSide.allCases {
-            addLauncher(side, at: launcherPosition(for: side))
-        }
 
         let shot = PrototypeLevel.shot(at: currentColorIndex)
         let previewBunny = shot.makeBunny()
@@ -547,44 +542,64 @@ final class GameScene: SKScene {
         hudLayer.addChild(fill)
     }
 
-    private func addLauncher(_ side: LaunchSide, at position: CGPoint) {
-        let isSelected = selectedSide == side
-        let node = SKShapeNode(circleOfRadius: 18)
-        node.name = "launcher:\(side.rawValue)"
-        node.position = position
-        node.fillColor = isSelected ? .systemYellow : SKColor(white: 0.25, alpha: 1)
-        node.strokeColor = isSelected ? .white : SKColor(white: 0.5, alpha: 1)
-        node.lineWidth = isSelected ? 3 : 1
-        node.zPosition = 4
-        hudLayer.addChild(node)
-
-        let glyph = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        glyph.name = node.name
-        glyph.text = side == .left ? "→" : side == .right ? "←" : "↑"
-        glyph.fontSize = 20
-        glyph.fontColor = .black
-        glyph.verticalAlignmentMode = .center
-        glyph.position = position
-        glyph.zPosition = 5
-        hudLayer.addChild(glyph)
-    }
-
-    private func launcherPosition(for side: LaunchSide) -> CGPoint {
+    private func projectileStartPosition(for side: LaunchSide, lane: Int) -> CGPoint {
         switch side {
         case .left:
-            CGPoint(x: boardOrigin.x - 25, y: boardOrigin.y + boardHeight / 2)
+            CGPoint(
+                x: boardOrigin.x - cellWidth * 0.72,
+                y: point(for: Cell(column: 0, row: lane)).y
+            )
         case .right:
-            CGPoint(x: boardOrigin.x + boardWidth + 25, y: boardOrigin.y + boardHeight / 2)
+            CGPoint(
+                x: boardOrigin.x + boardWidth + cellWidth * 0.72,
+                y: point(for: Cell(column: state.board.columnCount - 1, row: lane)).y
+            )
         case .bottom:
-            CGPoint(x: boardOrigin.x + boardWidth / 2, y: boardOrigin.y - 45)
+            CGPoint(
+                x: point(for: Cell(column: lane, row: 0)).x,
+                y: boardOrigin.y - cellHeight * 0.72
+            )
         }
     }
 
     private func updateHighlight(at point: CGPoint) {
-        guard let cell = boardCell(at: point) else { return }
-        highlightedLane = selectedSide == .bottom ? cell.column : cell.row
+        if let target = launchTarget(at: point) {
+            selectedSide = target.side
+            highlightedLane = target.lane
+        } else {
+            highlightedLane = nil
+        }
         drawGrid()
         updateAimReactions()
+    }
+
+    private func launchTarget(at point: CGPoint) -> LaunchTarget? {
+        let row = Int(((point.y - boardOrigin.y) / cellHeight).rounded(.down))
+        let isWithinBoardHeight = row >= 0 && row < state.board.rowCount
+        let sideHitSlop: CGFloat = 12
+
+        if isWithinBoardHeight,
+           point.x >= boardOrigin.x - sideHitSlop,
+           point.x < boardOrigin.x + cellWidth {
+            return LaunchTarget(side: .left, lane: row)
+        }
+
+        if isWithinBoardHeight,
+           point.x >= boardOrigin.x + boardWidth - cellWidth,
+           point.x < boardOrigin.x + boardWidth + sideHitSlop {
+            return LaunchTarget(side: .right, lane: row)
+        }
+
+        let bottomZoneHeight = max(52, cellHeight * 1.15)
+        let isWithinBottomZone = point.y >= boardOrigin.y - bottomZoneHeight
+            && point.y < boardOrigin.y
+        guard isWithinBottomZone,
+              point.x >= boardOrigin.x,
+              point.x < boardOrigin.x + boardWidth else { return nil }
+
+        let column = Int((point.x - boardOrigin.x) / cellWidth)
+        guard column >= 0, column < state.board.columnCount else { return nil }
+        return LaunchTarget(side: .bottom, lane: column)
     }
 
     private func updateAimReactions() {
@@ -605,24 +620,6 @@ final class GameScene: SKScene {
             x: boardOrigin.x + (CGFloat(cell.column) + 0.5) * cellWidth,
             y: boardOrigin.y + (CGFloat(cell.row) + 0.5) * cellHeight
         )
-    }
-
-    private func boardCell(at point: CGPoint) -> Cell? {
-        guard point.x >= boardOrigin.x, point.x < boardOrigin.x + boardWidth,
-              point.y >= boardOrigin.y, point.y < boardOrigin.y + boardHeight else { return nil }
-        let cell = Cell(
-            column: Int((point.x - boardOrigin.x) / cellWidth),
-            row: Int((point.y - boardOrigin.y) / cellHeight)
-        )
-        return state.board.contains(cell) ? cell : nil
-    }
-
-    private func launcherSide(at point: CGPoint) -> LaunchSide? {
-        LaunchSide.allCases.first { side in
-            hudLayer.children
-                .filter { $0.name == "launcher:\(side.rawValue)" }
-                .contains { $0.frame.insetBy(dx: -8, dy: -8).contains(point) }
-        }
     }
 
     private func controlName(at point: CGPoint) -> String? {
@@ -831,15 +828,37 @@ final class GameScene: SKScene {
         ]))
     }
 
-    private func shakeLauncher(_ side: LaunchSide) {
-        let nodes = hudLayer.children.filter { $0.name == "launcher:\(side.rawValue)" }
-        for node in nodes {
-            node.run(.sequence([
-                .moveBy(x: -5, y: 0, duration: 0.04),
-                .moveBy(x: 10, y: 0, duration: 0.08),
-                .moveBy(x: -5, y: 0, duration: 0.04)
-            ]))
+    private func pulseLaunchTarget(side: LaunchSide, lane: Int) {
+        let position: CGPoint
+        switch side {
+        case .left:
+            position = point(for: Cell(column: 0, row: lane))
+        case .right:
+            position = point(for: Cell(column: state.board.columnCount - 1, row: lane))
+        case .bottom:
+            position = CGPoint(
+                x: point(for: Cell(column: lane, row: 0)).x,
+                y: boardOrigin.y - cellHeight * 0.48
+            )
         }
+
+        let pulse = SKShapeNode(
+            rectOf: CGSize(width: cellWidth - 2, height: cellHeight - 2),
+            cornerRadius: 5
+        )
+        pulse.position = position
+        pulse.fillColor = .clear
+        pulse.strokeColor = .systemOrange
+        pulse.lineWidth = 4
+        pulse.zPosition = 35
+        effectLayer.addChild(pulse)
+        pulse.run(.sequence([
+            .group([
+                .scale(to: 1.18, duration: 0.16),
+                .fadeOut(withDuration: 0.22)
+            ]),
+            .removeFromParent()
+        ]))
     }
 
     private func resetGame() {

@@ -2,7 +2,7 @@
 
 Prototype 0.4 of an original, Boogie Bunnies-inspired birthday game for Beth.
 
-Open `BunBun.xcodeproj`, select the `BunBun` scheme, and run on an iPhone or iPhone simulator. Tap a launcher rail, then tap or drag across a lane. This build includes the provisional level loop plus red bomb bunnies, purple row/column bunnies, cascading special effects, a four-shot guided opening, progress decay, retuned fall pressure, and generated prototype bunny animation.
+Open `BunBun.xcodeproj`, select the `BunBun` scheme, and run on an iPhone or iPhone simulator. Tap or drag across a purple box on either side to launch through that row, or touch the invisible launch region below a column to launch upward. This build includes the provisional level loop plus red bomb bunnies, purple row/column bunnies, cascading special effects, a four-shot guided opening, progress decay, retuned fall pressure, and generated prototype bunny animation.
 
 The source is split into:
 
