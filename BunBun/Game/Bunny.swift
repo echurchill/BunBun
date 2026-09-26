@@ -36,7 +36,7 @@ struct Cell: Hashable, Codable, Sendable {
     }
 }
 
-enum LaunchSide: String, CaseIterable, Codable, Sendable {
+enum LaunchSide: String, CaseIterable, Codable, Equatable, Sendable {
     case left
     case right
     case bottom

@@ -1,6 +1,13 @@
 import SpriteKit
 import UIKit
 
+enum TelevisionNavigation {
+    case previousSide
+    case nextSide
+    case previousLane
+    case nextLane
+}
+
 final class GameScene: SKScene {
     private struct PlaytestRunStats {
         private let startedAt = Date()
@@ -73,8 +80,21 @@ final class GameScene: SKScene {
         UIDevice.current.userInterfaceIdiom == .pad
     }
 
+    private var isTelevisionLayout: Bool {
+#if os(tvOS)
+        true
+#else
+        false
+#endif
+    }
+
+    private var isLargeScreenLayout: Bool {
+        isTabletLayout || isTelevisionLayout
+    }
+
     private var hudScale: CGFloat {
-        isTabletLayout ? 1.22 : 1
+        if isTelevisionLayout { return 1.75 }
+        return isTabletLayout ? 1.22 : 1
     }
 
     init(
@@ -120,6 +140,10 @@ final class GameScene: SKScene {
         boardStageLayer.addChild(bunnyLayer)
         addChild(effectLayer)
         addChild(hudLayer)
+#if os(tvOS)
+        selectedSide = .left
+        highlightedLane = min(5, state.board.rowCount - 1)
+#endif
         renderAll()
     }
 
@@ -264,7 +288,9 @@ final class GameScene: SKScene {
         projectile.run(.sequence([
             .group([move, .scale(to: 1, duration: duration)]),
             .run {
+#if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
+#endif
             },
             .removeFromParent(),
             .run(completion)
@@ -306,7 +332,9 @@ final class GameScene: SKScene {
             message = stage.depth == 1 ? "MATCH!" : "CHAIN ×\(stage.depth)"
         }
         flashMessage(message, color: .systemYellow)
+#if os(iOS)
         UINotificationFeedbackGenerator().notificationOccurred(stage.depth == 1 ? .success : .warning)
+#endif
         addConfetti(for: stage.depth)
 
         for activation in stage.specialActivations {
@@ -376,7 +404,9 @@ final class GameScene: SKScene {
                 .run { [weak bunny] in bunny?.playAdvanceReaction() }
             ]))
         }
+#if os(iOS)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+#endif
         let postTransitionWait = outcome.fallenBunnies.isEmpty ? 0.40 : 1.85
         run(.sequence([
             .wait(forDuration: 0.56),
@@ -405,6 +435,11 @@ final class GameScene: SKScene {
     private func finishAnimation() {
         updateBunnies(state.board)
         drawStream()
+#if os(tvOS)
+        highlightedLane = min(highlightedLane ?? 0, maximumTelevisionLane)
+        drawGrid()
+        updateAimReactions()
+#endif
         drawHUD()
         isAnimating = false
         showEndStateIfNeeded()
@@ -897,9 +932,22 @@ final class GameScene: SKScene {
     }
 
     private func layoutBoard() {
-        let horizontalPadding: CGFloat = isTabletLayout ? max(54, size.width * 0.08) : 10
-        let maximumCellWidth: CGFloat = isTabletLayout ? 64 : 31
-        let boardHeightFraction: CGFloat = isTabletLayout ? 0.60 : 0.52
+        let horizontalPadding: CGFloat
+        let maximumCellWidth: CGFloat
+        let boardHeightFraction: CGFloat
+        if isTelevisionLayout {
+            horizontalPadding = max(180, size.width * 0.17)
+            maximumCellWidth = 76
+            boardHeightFraction = 0.54
+        } else if isTabletLayout {
+            horizontalPadding = max(54, size.width * 0.08)
+            maximumCellWidth = 64
+            boardHeightFraction = 0.60
+        } else {
+            horizontalPadding = 10
+            maximumCellWidth = 31
+            boardHeightFraction = 0.52
+        }
         cellWidth = min(
             maximumCellWidth,
             (size.width - horizontalPadding * 2) / CGFloat(state.board.columnCount)
@@ -910,7 +958,7 @@ final class GameScene: SKScene {
         )
         boardOrigin = CGPoint(
             x: (size.width - boardWidth) / 2,
-            y: (size.height - boardHeight) / 2 - (isTabletLayout ? 10 : 6)
+            y: (size.height - boardHeight) / 2 - (isLargeScreenLayout ? 10 : 6)
         )
 
         let boardCenter = CGPoint(
@@ -1201,11 +1249,12 @@ final class GameScene: SKScene {
         subtitle.position = CGPoint(x: size.width / 2, y: title.position.y - 24)
         hudLayer.addChild(subtitle)
 
-        let controlInset: CGFloat = isTabletLayout ? 90 : 58
+        let controlInset: CGFloat = isTelevisionLayout ? 150 : (isTabletLayout ? 90 : 58)
         addControl(name: "debug", text: showsDebug ? "DEBUG ON" : "DEBUG", x: controlInset)
         addControl(name: "restart", text: "RESTART", x: size.width - controlInset)
 
-        let meterWidth = min(isTabletLayout ? 150 : 92, (size.width - 48) / 3)
+        let preferredMeterWidth: CGFloat = isTelevisionLayout ? 230 : (isTabletLayout ? 150 : 92)
+        let meterWidth = min(preferredMeterWidth, (size.width - 48) / 3)
         let meterY = size.height - 166
         addMeter(
             title: "PROGRESS",
@@ -1243,9 +1292,10 @@ final class GameScene: SKScene {
             cellHeight: 31,
             color: spriteColor(for: shot.color)
         )
-        let previewY = isTabletLayout ? max(72, boardOrigin.y - cellHeight * 1.6) : 69
-        preview.position = CGPoint(x: size.width / 2 - (isTabletLayout ? 95 : 75), y: previewY)
-        preview.setScale(isTabletLayout ? 1.05 : 0.82)
+        let previewY = isLargeScreenLayout ? max(72, boardOrigin.y - cellHeight * 1.6) : 69
+        let previewOffset: CGFloat = isTelevisionLayout ? 150 : (isTabletLayout ? 95 : 75)
+        preview.position = CGPoint(x: size.width / 2 - previewOffset, y: previewY)
+        preview.setScale(isTelevisionLayout ? 1.35 : (isTabletLayout ? 1.05 : 0.82))
         hudLayer.addChild(preview)
 
         let label = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
@@ -1262,6 +1312,22 @@ final class GameScene: SKScene {
         label.verticalAlignmentMode = .center
         label.position = CGPoint(x: preview.position.x + 20, y: preview.position.y)
         hudLayer.addChild(label)
+
+#if os(tvOS)
+        let remoteHelp = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
+        remoteHelp.text = "◀︎ ▶︎ SIDE    ▲ ▼ LANE    SELECT LAUNCH    PLAY/PAUSE PAUSE    MENU LEVELS"
+        remoteHelp.fontSize = 12 * hudScale
+        remoteHelp.fontColor = SKColor(white: 0.86, alpha: 0.92)
+        remoteHelp.position = CGPoint(x: size.width / 2, y: 42)
+        hudLayer.addChild(remoteHelp)
+
+        let selection = SKLabelNode(fontNamed: "AvenirNext-Heavy")
+        selection.text = "\(selectedSide.rawValue.uppercased())  •  LANE \((highlightedLane ?? 0) + 1)"
+        selection.fontSize = 13 * hudScale
+        selection.fontColor = .systemYellow
+        selection.position = CGPoint(x: size.width / 2, y: 75)
+        hudLayer.addChild(selection)
+#endif
 
         if showsDebug {
             let debug = SKLabelNode(fontNamed: "Menlo")
@@ -1815,8 +1881,13 @@ final class GameScene: SKScene {
         effectLayer.removeAllChildren()
         state = GameState(board: level.startingBoard(), rules: level.rules)
         currentShotIndex = 0
+#if os(tvOS)
+        selectedSide = .left
+        highlightedLane = min(5, state.board.rowCount - 1)
+#else
         selectedSide = .bottom
         highlightedLane = nil
+#endif
         isAnimating = false
         showsDanceParty = false
         didReportCompletion = false
@@ -1826,6 +1897,60 @@ final class GameScene: SKScene {
         renderAll()
         flashMessage("READY!", color: .systemGreen)
     }
+
+#if os(tvOS)
+    private var maximumTelevisionLane: Int {
+        selectedSide == .bottom ? state.board.columnCount - 1 : state.board.rowCount - 1
+    }
+
+    func handleTelevisionNavigation(_ navigation: TelevisionNavigation) {
+        guard !isAnimating else { return }
+
+        let sides: [LaunchSide] = [.left, .bottom, .right]
+        var lane = highlightedLane ?? 0
+        switch navigation {
+        case .previousSide:
+            let index = sides.firstIndex(of: selectedSide) ?? 0
+            selectedSide = sides[(index + sides.count - 1) % sides.count]
+            lane = min(lane, maximumTelevisionLane)
+        case .nextSide:
+            let index = sides.firstIndex(of: selectedSide) ?? 0
+            selectedSide = sides[(index + 1) % sides.count]
+            lane = min(lane, maximumTelevisionLane)
+        case .previousLane:
+            lane = max(0, lane - 1)
+        case .nextLane:
+            lane = min(maximumTelevisionLane, lane + 1)
+        }
+
+        highlightedLane = lane
+        drawGrid()
+        updateAimReactions()
+        drawHUD()
+    }
+
+    func handleTelevisionSelect() {
+        guard !isAnimating else { return }
+
+        switch state.status {
+        case .playing:
+            guard let lane = highlightedLane else { return }
+            performLaunch(lane: lane)
+        case .won:
+            if hasNextLevel {
+                onRequestNextLevel()
+            } else {
+                resetGame()
+            }
+        case .lost:
+            resetGame()
+        }
+    }
+
+    func toggleTelevisionPause() {
+        isPaused.toggle()
+    }
+#endif
 
     private func spriteColor(for color: BunnyColor) -> SKColor {
         switch color {

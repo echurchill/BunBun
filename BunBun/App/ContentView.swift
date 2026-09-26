@@ -5,6 +5,18 @@ struct ContentView: View {
     @StateObject private var campaignController = CampaignController()
     @State private var selectedLevelID: LevelID?
 
+    init() {
+        var initialLevel: LevelID?
+#if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let flagIndex = arguments.firstIndex(of: "--bunbun-start-level"),
+           arguments.indices.contains(flagIndex + 1) {
+            initialLevel = LevelID(rawValue: arguments[flagIndex + 1])
+        }
+#endif
+        _selectedLevelID = State(initialValue: initialLevel)
+    }
+
     var body: some View {
         Group {
             if let selectedLevelID {
@@ -88,7 +100,7 @@ private struct LevelSelectionView: View {
                     .padding(.bottom, 30)
                 }
                 .padding(.horizontal, 22)
-                .frame(maxWidth: 680)
+                .frame(maxWidth: levelMenuMaximumWidth)
                 .frame(maxWidth: .infinity)
             }
         }
@@ -166,8 +178,18 @@ private struct LevelSelectionView: View {
             )
             .opacity(unlocked ? 1 : 0.7)
         }
+#if !os(tvOS)
         .buttonStyle(.plain)
+#endif
         .disabled(!unlocked)
+    }
+
+    private var levelMenuMaximumWidth: CGFloat {
+#if os(tvOS)
+        980
+#else
+        680
+#endif
     }
 
     private func themeColor(_ theme: LevelTheme) -> Color {
@@ -190,8 +212,13 @@ private final class GameSceneHolder: ObservableObject {
         onLevels: @escaping () -> Void,
         onNext: @escaping () -> Void
     ) {
+#if os(tvOS)
+        let initialSize = CGSize(width: 1920, height: 1080)
+#else
+        let initialSize = CGSize(width: 390, height: 844)
+#endif
         scene = GameScene(
-            size: CGSize(width: 390, height: 844),
+            size: initialSize,
             level: level,
             hasNextLevel: hasNextLevel,
             onLevelCompleted: onCompleted,
@@ -204,8 +231,12 @@ private final class GameSceneHolder: ObservableObject {
 
 private struct GameContainerView: View {
     let level: LevelDefinition
+    let onLevels: () -> Void
     @StateObject private var holder: GameSceneHolder
     @State private var showsLevelIntro = true
+#if os(tvOS)
+    @FocusState private var gameplayFocused: Bool
+#endif
 
     init(
         level: LevelDefinition,
@@ -215,6 +246,7 @@ private struct GameContainerView: View {
         onNext: @escaping () -> Void
     ) {
         self.level = level
+        self.onLevels = onLevels
         _holder = StateObject(wrappedValue: GameSceneHolder(
             level: level,
             hasNextLevel: hasNextLevel,
@@ -244,6 +276,34 @@ private struct GameContainerView: View {
                 .allowsHitTesting(false)
             }
         }
+#if os(tvOS)
+        .focusable()
+        .focused($gameplayFocused)
+        .onAppear { gameplayFocused = true }
+        .onMoveCommand { direction in
+            switch direction {
+            case .left:
+                holder.scene.handleTelevisionNavigation(.previousSide)
+            case .right:
+                holder.scene.handleTelevisionNavigation(.nextSide)
+            case .up:
+                holder.scene.handleTelevisionNavigation(.nextLane)
+            case .down:
+                holder.scene.handleTelevisionNavigation(.previousLane)
+            @unknown default:
+                break
+            }
+        }
+        .onTapGesture {
+            holder.scene.handleTelevisionSelect()
+        }
+        .onPlayPauseCommand {
+            holder.scene.toggleTelevisionPause()
+        }
+        .onExitCommand {
+            onLevels()
+        }
+#endif
         .task {
             try? await Task.sleep(for: .milliseconds(850))
             withAnimation(.easeOut(duration: 0.28)) {

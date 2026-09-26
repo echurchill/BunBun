@@ -341,3 +341,32 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 
 - All previous matching, chain, geometry, pressure, special, and turn tests remain active.
 - New tests verify level validity, match-free starts, level-specific rules, deterministic arrivals, sequential unlocks, loss behavior, best-score replacement, final-level bounds, Codable round-tripping, persistence reset, and corrupt-save recovery.
+
+## 12. Apple TV feasibility pass
+
+Apple TV is a presentation and input variant, not a separate game. The `BunBun TV` target compiles the same pure Swift rules, level catalog, campaign model, SpriteKit scene, generated bunny sheets, backgrounds, and environmental effects used by iPhone and iPad.
+
+### Television presentation
+
+- Gameplay uses a dedicated 16:9 layout with a centered board, television-scale HUD, larger meters and labels, and safe margins for overscan and comfortable viewing distance.
+- The SwiftUI level picker uses native tvOS focus behavior and a constrained card width rather than stretching across the television.
+- The current aim remains visible without touch: the selected launcher side and lane are shown in the HUD, while the board retains the aim glow, target lift, and formation lean.
+- All three launch directions remain available. There is no television-specific change to matching, specials, advancement, danger, scoring, dance parties, or level tuning.
+
+### Siri Remote controls
+
+- Left/Right cycles between the left, bottom, and right launchers.
+- Up/Down changes the row or column within the selected launcher.
+- Select launches the current bunny. On a result screen, Select advances, replays, or retries as appropriate.
+- Play/Pause pauses or resumes the SpriteKit scene.
+- Menu returns to the level picker.
+
+The initial milestone deliberately avoids indirect cursor simulation and motion control. A future pass can add controller shortcuts, clearer pause feedback, sound, and optional shared campaign progress after the basic remote interaction has been tested on real Apple TV hardware.
+
+### Feasibility verification
+
+- Xcode exposes distinct `BunBun` and `BunBun TV` schemes with the configured development team preserved.
+- The tvOS target builds for an Apple TV 4K simulator without changing the shared rules layer.
+- The focus-driven level picker was visually verified at 1920×1080 in the simulator.
+- Automated iPhone rules and campaign tests remain the cross-platform logic regression suite.
+- Hands-on Siri Remote navigation and a complete level playthrough remain required on an unlocked simulator or physical Apple TV before calling television input fully validated.

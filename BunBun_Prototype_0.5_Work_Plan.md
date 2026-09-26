@@ -193,6 +193,19 @@ Prototype 0.5 is complete when:
 
 The remaining completion gate is hands-on playtesting of all three levels on physical iPhone and iPad hardware, followed by tuning from the recorded launch counts, falls, specials, and dance parties.
 
+## Apple TV feasibility milestone — September 26, 2026
+
+- Added a separate `BunBun TV` tvOS application target and shared scheme while preserving the iPhone/iPad target and development team.
+- Reused every gameplay model, level definition, campaign type, animation sheet, background, and SpriteKit presentation source instead of forking the game.
+- Added a native focus-driven tvOS level picker and a 16:9 gameplay layout with television-scale HUD text, meters, board cells, launcher feedback, and viewing-distance margins.
+- Mapped Siri Remote directional input to the reconstructed three-sided launcher: Left/Right changes side and Up/Down changes lane.
+- Mapped Select to launch and to the appropriate Continue/Replay/Retry action after a run, Play/Pause to scene pause, and Menu to the level picker.
+- Added an on-screen remote-control reminder and explicit current side/lane label.
+- Verified the tvOS target builds for Apple TV 4K Simulator and visually checked the 1920×1080 native-focus level menu.
+- Kept television campaign persistence local to the tvOS bundle for now. Cross-device progress is a possible later iCloud or Game Center task, not a prerequisite for audio work.
+
+Remaining television checks are hands-on remote navigation, a complete level playthrough, and final viewing-distance tuning on an unlocked simulator or physical Apple TV. App Store icons and Top Shelf artwork are release work, not part of this feasibility milestone.
+
 ## Recommended implementation order
 
 1. Introduce `LevelDefinition` and migrate Bunny Lab with no intended behavior change.
