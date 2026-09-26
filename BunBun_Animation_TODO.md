@@ -23,7 +23,13 @@ This gives us one consistent animation source per motion rather than six separat
 | Dance two-step | `BunnyDanceTwoStepSheet.png` | Dance-party variant two |
 | Dance happy-hop | `BunnyDanceHopSheet.png` | Dance-party variant three |
 
-Each bunny derives a stable personality number from its identifier. That number currently chooses a small size difference, idle tempo, phase offset, and dance loop. It avoids synchronized formation movement and creates personality without changing the game model.
+Each bunny derives a stable personality number from its identifier. That number currently chooses a small size difference, idle tempo, calm-crowd cohort, and dance loop. It creates personality without changing the game model.
+
+### Calm-crowd timing
+
+The original game footage shows that most bunnies hold a readable neutral pose during ordinary play. Large movement is reserved for the launched bunny, a successful match, board advancement, and group celebrations. BunBun therefore divides ordinary board bunnies into five deterministic cohorts. Each cohort performs one short idle gesture in its own time slot and then holds the neutral frame, keeping roughly 20 percent of the crowd active at once. Aiming animates only the first three bunnies along the selected launch path, board-advance reactions ripple in small waves, and dance-party loops start with staggered phases.
+
+This timing belongs entirely to the presentation layer. Matching, chains, scoring, and board advancement do not depend on it.
 
 ## Repeatable creation pipeline
 
@@ -61,6 +67,7 @@ Use a genuinely transparent alpha background. No floor, shadows, scenery, text, 
 - Generate loops and one-shot reactions separately.
 - Keep bombs, line symbols, particles, confetti, beams, and warning cues out of the generated art. Code-driven overlays are sharper, cheaper, and easier to tune.
 - Generate only the blue master. Runtime hue adjustment produces more consistent color families than six independent generations.
+- Never use SpriteKit's convenience texture-animation action for the generated sheets. On SpriteKit 27 it can resize a sprite to the source frame's native pixel dimensions while advancing frames. BunBun swaps each texture explicitly and reapplies the board-relative display size on every frame.
 - Stagger loops and use multiple dance cycles. Perfect synchronization makes a lively crowd look mechanical.
 - Treat generated artwork as prototype production material until its commercial-use terms and final provenance are archived.
 

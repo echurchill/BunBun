@@ -1,4 +1,5 @@
 import XCTest
+import SpriteKit
 @testable import BunBun
 
 final class BoardAndTurnTests: XCTestCase {
@@ -46,5 +47,34 @@ final class BoardAndTurnTests: XCTestCase {
         let passiveMatch = MatchEngine().allMatches(on: state.board)
         XCTAssertEqual(passiveMatch.count, 1)
         XCTAssertEqual(passiveMatch[0].count, 3)
+    }
+
+    @MainActor
+    func testBunnyNodeKeepsGeneratedTextureInsideItsBoardCell() async throws {
+        let cellWidth: CGFloat = 31
+        let cellHeight: CGFloat = 45.5
+        let immediateIdleID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000004")
+        )
+        let node = BunnyNode(
+            bunny: Bunny(id: immediateIdleID, color: .blue),
+            cellWidth: cellWidth,
+            cellHeight: cellHeight,
+            color: .systemBlue
+        )
+        let scene = SKScene(size: CGSize(width: 390, height: 844))
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        scene.addChild(node)
+        view.presentScene(scene)
+
+        // This ID belongs to idle cohort zero, so its generated texture action
+        // starts immediately. Waiting catches a resize that initial-state tests
+        // cannot see.
+        try await Task.sleep(for: .milliseconds(1_400))
+
+        let renderedBounds = node.calculateAccumulatedFrame()
+
+        XCTAssertLessThanOrEqual(renderedBounds.width, cellWidth * 1.2)
+        XCTAssertLessThanOrEqual(renderedBounds.height, cellHeight * 1.2)
     }
 }

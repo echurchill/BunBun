@@ -299,8 +299,15 @@ final class GameScene: SKScene {
 
         flashMessage("HOP!", color: .systemPink)
         updateBunnies(outcome.boardAfterResolution)
-        for case let bunny as BunnyNode in bunnyLayer.children {
-            bunny.playAdvanceReaction()
+        for (cell, model) in outcome.boardAfterResolution.occupants {
+            guard let bunny = bunnyLayer.childNode(
+                withName: "bunny:\(model.id.uuidString)"
+            ) as? BunnyNode else { continue }
+            let delay = Double((cell.column + cell.row * 2) % 5) * 0.055
+            bunny.run(.sequence([
+                .wait(forDuration: delay),
+                .run { [weak bunny] in bunny?.playAdvanceReaction() }
+            ]))
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let postTransitionWait = outcome.fallenBunnies.isEmpty ? 0.40 : 0.74
@@ -666,15 +673,34 @@ final class GameScene: SKScene {
     }
 
     private func updateAimReactions() {
+        let reactingCells: Set<Cell>
+        if let highlightedLane {
+            let candidates = state.board.occupants.keys.filter { cell in
+                selectedSide == .bottom
+                    ? cell.column == highlightedLane
+                    : cell.row == highlightedLane
+            }
+            let ordered = candidates.sorted { lhs, rhs in
+                switch selectedSide {
+                case .bottom:
+                    lhs.row < rhs.row
+                case .left:
+                    lhs.column < rhs.column
+                case .right:
+                    lhs.column > rhs.column
+                }
+            }
+            reactingCells = Set(ordered.prefix(3))
+        } else {
+            reactingCells = []
+        }
+
         for (cell, bunny) in state.board.occupants {
             guard let node = bunnyLayer.childNode(
                 withName: "bunny:\(bunny.id.uuidString)"
             ) as? BunnyNode else { continue }
 
-            let isInHighlightedLane = highlightedLane.map { lane in
-                selectedSide == .bottom ? cell.column == lane : cell.row == lane
-            } ?? false
-            node.setAiming(isInHighlightedLane)
+            node.setAiming(reactingCells.contains(cell))
         }
     }
 

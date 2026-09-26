@@ -93,6 +93,7 @@ final class BunnyNode: SKNode {
     private let cellWidth: CGFloat
     private let cellHeight: CGFloat
     private let animationSeed: Int
+    private var spriteDisplaySize = CGSize.zero
     private var isAiming = false
     private var isDancing = false
     private var isPerformingOneShot = false
@@ -112,13 +113,15 @@ final class BunnyNode: SKNode {
 
         let idleTextures = BunnyAnimationLibrary.shared.textures(for: .idle, color: bunny.color)
         if let firstTexture = idleTextures.first {
+            let displaySize = CGSize(
+                width: cellWidth * (1.05 + CGFloat(animationSeed % 3) * 0.025),
+                height: cellHeight * (1.05 + CGFloat(animationSeed % 3) * 0.025)
+            )
             let sprite = SKSpriteNode(
                 texture: firstTexture,
-                size: CGSize(
-                    width: cellWidth * (1.05 + CGFloat(animationSeed % 3) * 0.025),
-                    height: cellHeight * (1.05 + CGFloat(animationSeed % 3) * 0.025)
-                )
+                size: displaySize
             )
+            spriteDisplaySize = displaySize
             sprite.position.y = cellHeight * 0.04
             sprite.zPosition = 0
             addChild(sprite)
@@ -137,7 +140,7 @@ final class BunnyNode: SKNode {
         guard !isDancing, !isPerformingOneShot else { return }
 
         if aiming {
-            _ = play(.aim, timePerFrame: 0.105, repeats: true)
+            _ = play(.aim, timePerFrame: 0.135, repeats: true)
         } else {
             playIdle()
         }
@@ -216,7 +219,13 @@ final class BunnyNode: SKNode {
         case 1: .danceTwoStep
         default: .danceHop
         }
-        if dancing, play(danceMotion, timePerFrame: 0.10, repeats: true) {
+        let danceDelay = Double(animationSeed % 7) * 0.045
+        if dancing, play(
+            danceMotion,
+            timePerFrame: 0.115,
+            repeats: true,
+            initialDelay: danceDelay
+        ) {
             return
         }
         if sprite != nil {
@@ -242,22 +251,62 @@ final class BunnyNode: SKNode {
         guard !textures.isEmpty else { return }
 
         sprite.removeAction(forKey: "textureAnimation")
-        let delay = Double(animationSeed % 8) * 0.018
-        let idleSpeed = [0.105, 0.12, 0.135][animationSeed % 3]
-        let animation = SKAction.repeatForever(.animate(with: textures, timePerFrame: idleSpeed))
-        sprite.run(.sequence([.wait(forDuration: delay), animation]), withKey: "textureAnimation")
+        // Boogie Bunnies held readable poses between short gestures. Divide the
+        // crowd into five stable cohorts so only about one fifth is moving at
+        // once, then return every bunny to the neutral first frame.
+        let idleSpeed = [0.125, 0.132, 0.138][animationSeed % 3]
+        let gestureDuration = idleSpeed * Double(textures.count)
+        let cohortSlot: TimeInterval = 1.15
+        let cycleDuration = cohortSlot * 5
+        let cohort = animationSeed % 5
+        let personalityOffset = Double((animationSeed / 5) % 4) * 0.035
+        let initialDelay = Double(cohort) * cohortSlot + personalityOffset
+        let restDuration = max(0.2, cycleDuration - gestureDuration)
+        let gesture = fixedSizeAnimation(
+            textures: textures,
+            timePerFrame: idleSpeed,
+            on: sprite
+        )
+        let cadence = SKAction.repeatForever(.sequence([
+            gesture,
+            .setTexture(textures[0], resize: false),
+            .run { [weak self, weak sprite] in
+                guard let self else { return }
+                sprite?.size = self.spriteDisplaySize
+            },
+            .wait(forDuration: restDuration)
+        ]))
+        sprite.run(
+            .sequence([.wait(forDuration: initialDelay), cadence]),
+            withKey: "textureAnimation"
+        )
     }
 
     @discardableResult
-    private func play(_ motion: BunnyMotion, timePerFrame: TimeInterval, repeats: Bool) -> Bool {
+    private func play(
+        _ motion: BunnyMotion,
+        timePerFrame: TimeInterval,
+        repeats: Bool,
+        initialDelay: TimeInterval = 0
+    ) -> Bool {
         guard let sprite else { return false }
         let textures = BunnyAnimationLibrary.shared.textures(for: motion, color: bunnyColor)
         guard !textures.isEmpty else { return false }
 
         sprite.removeAction(forKey: "textureAnimation")
-        let animation = SKAction.animate(with: textures, timePerFrame: timePerFrame)
+        let animation = fixedSizeAnimation(
+            textures: textures,
+            timePerFrame: timePerFrame,
+            on: sprite
+        )
         if repeats {
-            sprite.run(.repeatForever(animation), withKey: "textureAnimation")
+            sprite.run(
+                .sequence([
+                    .wait(forDuration: initialDelay),
+                    .repeatForever(animation)
+                ]),
+                withKey: "textureAnimation"
+            )
         } else {
             sprite.run(.sequence([
                 animation,
@@ -270,11 +319,31 @@ final class BunnyNode: SKNode {
         return true
     }
 
+    /// SpriteKit 27 can resize a sprite to a generated texture's native pixel
+    /// dimensions while advancing a texture animation, even when the action's
+    /// resize flag is false. Reasserting the presentation size with every frame
+    /// keeps the high-resolution source art independent of board geometry.
+    private func fixedSizeAnimation(
+        textures: [SKTexture],
+        timePerFrame: TimeInterval,
+        on sprite: SKSpriteNode
+    ) -> SKAction {
+        let displaySize = spriteDisplaySize
+        let frames = textures.map { texture in
+            SKAction.sequence([
+                .setTexture(texture, resize: false),
+                .run { [weak sprite] in sprite?.size = displaySize },
+                .wait(forDuration: timePerFrame)
+            ])
+        }
+        return .sequence(frames)
+    }
+
     private func resumeAmbientMotion() {
         if isDancing {
             setDancing(true)
         } else if isAiming {
-            _ = play(.aim, timePerFrame: 0.105, repeats: true)
+            _ = play(.aim, timePerFrame: 0.135, repeats: true)
         } else {
             playIdle()
         }
