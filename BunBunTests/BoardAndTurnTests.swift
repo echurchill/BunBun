@@ -77,4 +77,41 @@ final class BoardAndTurnTests: XCTestCase {
         XCTAssertLessThanOrEqual(renderedBounds.width, cellWidth * 1.2)
         XCTAssertLessThanOrEqual(renderedBounds.height, cellHeight * 1.2)
     }
+
+    @MainActor
+    func testBunnyNodeKeepsItsSizeWhenIdleIsInterruptedByCelebration() async throws {
+        let cellWidth: CGFloat = 31
+        let cellHeight: CGFloat = 45.5
+        let immediateIdleID = try XCTUnwrap(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000004")
+        )
+        let node = BunnyNode(
+            bunny: Bunny(id: immediateIdleID, color: .orange),
+            cellWidth: cellWidth,
+            cellHeight: cellHeight,
+            color: .systemYellow
+        )
+        let scene = SKScene(size: CGSize(width: 390, height: 844))
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        scene.addChild(node)
+        view.presentScene(scene)
+
+        // Reproduce the reported path: the yellow/orange cohort begins its
+        // idle gesture and is immediately switched to the match celebration.
+        try await Task.sleep(for: .milliseconds(80))
+        node.playCelebration(chainDepth: 1)
+
+        // Also prove that the final render-pass guard repairs any native-size
+        // frame left behind by an interrupted SpriteKit texture action.
+        let sprite = try XCTUnwrap(node.children.compactMap { $0 as? SKSpriteNode }.first)
+        sprite.size = CGSize(width: 2_048, height: 2_048)
+        node.enforceDisplaySize()
+
+        for _ in 0..<8 {
+            try await Task.sleep(for: .milliseconds(75))
+            let renderedBounds = node.calculateAccumulatedFrame()
+            XCTAssertLessThanOrEqual(renderedBounds.width, cellWidth * 1.2)
+            XCTAssertLessThanOrEqual(renderedBounds.height, cellHeight * 1.2)
+        }
+    }
 }

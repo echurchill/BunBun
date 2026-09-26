@@ -107,6 +107,20 @@ final class GameScene: SKScene {
         renderAll()
     }
 
+    override func didFinishUpdate() {
+        enforceBunnyDisplaySizes(in: self)
+    }
+
+    private func enforceBunnyDisplaySizes(in parent: SKNode) {
+        for child in parent.children {
+            if let bunny = child as? BunnyNode {
+                bunny.enforceDisplaySize()
+            } else {
+                enforceBunnyDisplaySizes(in: child)
+            }
+        }
+    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !isAnimating, let point = touches.first?.location(in: self) else { return }
         updateHighlight(at: point)

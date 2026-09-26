@@ -146,6 +146,14 @@ final class BunnyNode: SKNode {
         }
     }
 
+    /// Final render-pass safety net for SpriteKit texture actions. The scene
+    /// calls this after actions have been evaluated so no generated sheet can
+    /// reach the renderer at its native pixel dimensions.
+    func enforceDisplaySize() {
+        guard let sprite, sprite.size != spriteDisplaySize else { return }
+        sprite.size = spriteDisplaySize
+    }
+
     func playCelebration(chainDepth: Int) {
         isPerformingOneShot = true
         let speed = max(0.042, 0.068 - Double(chainDepth - 1) * 0.008)
@@ -269,11 +277,7 @@ final class BunnyNode: SKNode {
         )
         let cadence = SKAction.repeatForever(.sequence([
             gesture,
-            .setTexture(textures[0], resize: false),
-            .run { [weak self, weak sprite] in
-                guard let self else { return }
-                sprite?.size = self.spriteDisplaySize
-            },
+            textureFrameAction(textures[0], on: sprite),
             .wait(forDuration: restDuration)
         ]))
         sprite.run(
@@ -320,23 +324,31 @@ final class BunnyNode: SKNode {
     }
 
     /// SpriteKit 27 can resize a sprite to a generated texture's native pixel
-    /// dimensions while advancing a texture animation, even when the action's
-    /// resize flag is false. Reasserting the presentation size with every frame
-    /// keeps the high-resolution source art independent of board geometry.
+    /// dimensions while advancing an `SKAction.setTexture` animation, even when
+    /// that action's resize flag is false. Worse, interrupting the action while
+    /// changing from idle to celebration can strand the sprite at that enormous
+    /// source size. Assigning the texture and display size inside one run block
+    /// makes the frame change atomic from the scene's point of view.
     private func fixedSizeAnimation(
         textures: [SKTexture],
         timePerFrame: TimeInterval,
         on sprite: SKSpriteNode
     ) -> SKAction {
-        let displaySize = spriteDisplaySize
         let frames = textures.map { texture in
             SKAction.sequence([
-                .setTexture(texture, resize: false),
-                .run { [weak sprite] in sprite?.size = displaySize },
+                textureFrameAction(texture, on: sprite),
                 .wait(forDuration: timePerFrame)
             ])
         }
         return .sequence(frames)
+    }
+
+    private func textureFrameAction(_ texture: SKTexture, on sprite: SKSpriteNode) -> SKAction {
+        let displaySize = spriteDisplaySize
+        return .run { [weak sprite] in
+            sprite?.texture = texture
+            sprite?.size = displaySize
+        }
     }
 
     private func resumeAmbientMotion() {
