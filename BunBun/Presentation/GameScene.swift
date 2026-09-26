@@ -53,6 +53,8 @@ final class GameScene: SKScene {
     private var didReportCompletion = false
     private var playtestStats = PlaytestRunStats()
 
+    private let backgroundLayer = SKNode()
+    private let ambientLightLayer = SKNode()
     private let partyLayer = SKNode()
     private let gridLayer = SKNode()
     private let bunnyLayer = SKNode()
@@ -94,6 +96,8 @@ final class GameScene: SKScene {
 
     override func didMove(to view: SKView) {
         backgroundColor = themeBackgroundColor
+        addChild(backgroundLayer)
+        addChild(ambientLightLayer)
         addChild(partyLayer)
         addChild(gridLayer)
         addChild(bunnyLayer)
@@ -428,6 +432,7 @@ final class GameScene: SKScene {
 
     private func renderAll() {
         guard size.width > 0, size.height > 0 else { return }
+        layoutBackground()
         layoutBoard()
         drawGrid()
         updateBunnies(state.board)
@@ -436,6 +441,121 @@ final class GameScene: SKScene {
         if showsDanceParty {
             configureDancePartyBackdrop()
         }
+    }
+
+    private func layoutBackground() {
+        backgroundLayer.removeAllChildren()
+
+        let texture = SKTexture(imageNamed: level.theme.backgroundAssetName)
+        texture.filteringMode = .linear
+        let textureSize = texture.size()
+        guard textureSize.width > 0, textureSize.height > 0 else { return }
+
+        let fillScale = max(size.width / textureSize.width, size.height / textureSize.height)
+        let image = SKSpriteNode(
+            texture: texture,
+            size: CGSize(
+                width: textureSize.width * fillScale,
+                height: textureSize.height * fillScale
+            )
+        )
+        image.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        image.zPosition = -100
+        backgroundLayer.addChild(image)
+
+        let shade = SKShapeNode(rectOf: size)
+        shade.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        shade.fillColor = SKColor(white: 0, alpha: isTabletLayout ? 0.48 : 0.42)
+        shade.strokeColor = .clear
+        shade.zPosition = -99
+        backgroundLayer.addChild(shade)
+
+        configureAmbientLights(danceMode: showsDanceParty)
+    }
+
+    private func configureAmbientLights(danceMode: Bool) {
+        ambientLightLayer.removeAllChildren()
+        let positions = ambientLightPositions
+        let seed = level.id.rawValue.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        let ordered = positions.indices.sorted {
+            (($0 * 17 + seed) % 37) < (($1 * 17 + seed) % 37)
+        }
+        let lightCount = min(danceMode ? 14 : 6, positions.count)
+
+        for (order, index) in ordered.prefix(lightCount).enumerated() {
+            let normalized = positions[index]
+            let radius = CGFloat(3 + (index + seed) % 4) * (isTabletLayout ? 1.25 : 1)
+            let light = SKShapeNode(circleOfRadius: radius)
+            light.position = CGPoint(x: normalized.x * size.width, y: normalized.y * size.height)
+            light.fillColor = ambientLightColor(index: index, danceMode: danceMode)
+            light.strokeColor = .white.withAlphaComponent(danceMode ? 0.38 : 0.20)
+            light.lineWidth = 1
+            light.glowWidth = radius * (danceMode ? 3.2 : 2.1)
+            light.blendMode = .add
+            light.alpha = 0.10
+            light.zPosition = -80
+            ambientLightLayer.addChild(light)
+
+            let delay = Double((index * 11 + seed + order * 3) % 19) * 0.09
+            let brighten = danceMode ? 0.74 : 0.42
+            let dim = danceMode ? 0.16 : 0.08
+            let rise = danceMode ? 0.18 + Double(index % 3) * 0.04 : 0.42 + Double(index % 4) * 0.08
+            let fall = danceMode ? 0.24 + Double(index % 4) * 0.04 : 0.55 + Double(index % 3) * 0.10
+            light.run(.sequence([
+                .wait(forDuration: delay),
+                .repeatForever(.sequence([
+                    .fadeAlpha(to: brighten, duration: rise),
+                    .fadeAlpha(to: dim, duration: fall),
+                    .wait(forDuration: danceMode ? 0.08 : 0.35 + Double(index % 5) * 0.16)
+                ]))
+            ]))
+        }
+    }
+
+    private var ambientLightPositions: [CGPoint] {
+        switch level.theme {
+        case .lab:
+            [
+                CGPoint(x: 0.08, y: 0.84), CGPoint(x: 0.18, y: 0.69),
+                CGPoint(x: 0.32, y: 0.78), CGPoint(x: 0.68, y: 0.76),
+                CGPoint(x: 0.82, y: 0.68), CGPoint(x: 0.93, y: 0.84),
+                CGPoint(x: 0.11, y: 0.48), CGPoint(x: 0.89, y: 0.49),
+                CGPoint(x: 0.22, y: 0.91), CGPoint(x: 0.78, y: 0.91),
+                CGPoint(x: 0.15, y: 0.24), CGPoint(x: 0.85, y: 0.25),
+                CGPoint(x: 0.38, y: 0.66), CGPoint(x: 0.62, y: 0.66),
+                CGPoint(x: 0.50, y: 0.82), CGPoint(x: 0.50, y: 0.18)
+            ]
+        case .meadow:
+            [
+                CGPoint(x: 0.08, y: 0.76), CGPoint(x: 0.17, y: 0.61),
+                CGPoint(x: 0.29, y: 0.82), CGPoint(x: 0.72, y: 0.78),
+                CGPoint(x: 0.84, y: 0.60), CGPoint(x: 0.94, y: 0.74),
+                CGPoint(x: 0.12, y: 0.38), CGPoint(x: 0.88, y: 0.40),
+                CGPoint(x: 0.23, y: 0.26), CGPoint(x: 0.77, y: 0.25),
+                CGPoint(x: 0.36, y: 0.70), CGPoint(x: 0.64, y: 0.67),
+                CGPoint(x: 0.42, y: 0.48), CGPoint(x: 0.58, y: 0.52),
+                CGPoint(x: 0.34, y: 0.34), CGPoint(x: 0.68, y: 0.35)
+            ]
+        case .rehearsal:
+            [
+                CGPoint(x: 0.08, y: 0.91), CGPoint(x: 0.18, y: 0.94),
+                CGPoint(x: 0.30, y: 0.92), CGPoint(x: 0.42, y: 0.95),
+                CGPoint(x: 0.58, y: 0.95), CGPoint(x: 0.70, y: 0.92),
+                CGPoint(x: 0.82, y: 0.94), CGPoint(x: 0.92, y: 0.91),
+                CGPoint(x: 0.10, y: 0.69), CGPoint(x: 0.90, y: 0.69),
+                CGPoint(x: 0.18, y: 0.52), CGPoint(x: 0.82, y: 0.52),
+                CGPoint(x: 0.28, y: 0.77), CGPoint(x: 0.72, y: 0.77),
+                CGPoint(x: 0.39, y: 0.84), CGPoint(x: 0.61, y: 0.84)
+            ]
+        }
+    }
+
+    private func ambientLightColor(index: Int, danceMode: Bool) -> SKColor {
+        guard danceMode else {
+            return level.theme == .meadow ? .systemYellow : .white
+        }
+        let colors: [SKColor] = [.systemPink, .systemYellow, .systemBlue, .systemPurple, .systemGreen]
+        return colors[index % colors.count]
     }
 
     private func layoutBoard() {
@@ -891,12 +1011,14 @@ final class GameScene: SKScene {
     private func applyDancePartyTransition(_ outcome: TurnOutcome) {
         if outcome.dancePartyStarted {
             showsDanceParty = true
+            configureAmbientLights(danceMode: true)
             configureDancePartyBackdrop()
             updateBunnies(outcome.boardAfterResolution)
             flashMessage("DANCE PARTY!  2×", color: .systemYellow)
             addConfetti(for: 3)
         } else if outcome.dancePartyEnded {
             showsDanceParty = false
+            configureAmbientLights(danceMode: false)
             partyLayer.removeAllChildren()
             backgroundColor = themeBackgroundColor
         }

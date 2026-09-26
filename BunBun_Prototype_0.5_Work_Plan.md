@@ -180,6 +180,14 @@ Prototype 0.5 is complete when:
 - Verified the level picker and gameplay on iPhone and on a 13-inch iPad simulator in portrait and landscape. A direct side-box match succeeded in iPad landscape.
 - Expanded the suite from 21 to 28 passing tests.
 
+## Post-0.5 environment and campaign expansion — September 26, 2026
+
+- Expanded the campaign from three to six levels while retaining data-driven rules and sequential unlocking.
+- Grouped the levels into three pairs that deliberately share Carrot Workshop, Moonlit Garden, and Birthday Pavilion backgrounds.
+- Added original AI-generated square environment plates with safe portrait/landscape cropping and a quiet central playfield.
+- Added subtle code-driven ambient light glimmers, with a denser and faster lighting pass during dance parties.
+- Added the shared background thumbnails to the level picker so paired stages are visually related.
+
 The remaining completion gate is hands-on playtesting of all three levels on physical iPhone and iPad hardware, followed by tuning from the recorded launch counts, falls, specials, and dance parties.
 
 ## Recommended implementation order

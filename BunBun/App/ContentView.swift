@@ -115,11 +115,19 @@ private struct LevelSelectionView: View {
         } label: {
             HStack(spacing: 15) {
                 ZStack {
+                    Image(level.theme.backgroundAssetName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 58, height: 68)
+                        .clipShape(RoundedRectangle(cornerRadius: 15))
+                        .saturation(unlocked ? 1 : 0)
+                        .opacity(unlocked ? 0.92 : 0.28)
                     RoundedRectangle(cornerRadius: 15)
-                        .fill(themeColor(level.theme).opacity(unlocked ? 0.9 : 0.22))
+                        .fill(themeColor(level.theme).opacity(unlocked ? 0.20 : 0.30))
                         .frame(width: 58, height: 68)
                     Text(unlocked ? "\(number)" : "🔒")
                         .font(.system(size: unlocked ? 25 : 20, weight: .black, design: .rounded))
+                        .shadow(color: .black.opacity(0.75), radius: 3)
                 }
 
                 VStack(alignment: .leading, spacing: 5) {

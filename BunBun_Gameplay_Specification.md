@@ -298,9 +298,20 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 - `LevelDefinition` owns the starting layout, supplied shots, deterministic arrival pattern, tutorial prompts, theme identifier, and gameplay tuning.
 - `GameState` consumes a level's `GameRules`; matching, chaining, board geometry, and special behavior remain shared.
 - **Bunny Lab** preserves the Prototype 0.4 opening and forgiving tuning.
+- **Carrot Works** reuses the workshop setting with a new board, shot order, deterministic arrivals, and a modest pressure increase.
 - **Moonlight Meadow** removes explicit tutorials, uses denser arrivals, and increases pressure around special-bunny planning.
+- **Firefly Falls** reuses the moonlit setting while increasing progress decay, danger, and chain-planning pressure.
 - **Dance Rehearsal** advances every two launches, charges dance parties faster, supplies more special combinations, and uses a lower progress target for a shorter high-energy finale.
+- **Birthday Bash** reuses the pavilion for a faster final stage with frequent dance parties and both special-bunny types.
 - Every starting board is automatically verified to contain no passive match.
+
+### Shared environment presentation
+
+- Six levels are grouped into three two-level environment sets: Carrot Workshop, Moonlit Garden, and Birthday Pavilion.
+- Square environment plates use aspect-fill cropping so they work on portrait iPhone and portrait or landscape iPad.
+- The central playfield is intentionally darkened for bunny and grid readability.
+- A deterministic subset of background lights glimmers slowly during normal play.
+- Dance parties activate more background lights, brighter colors, and a quicker pulse while leaving gameplay geometry unchanged.
 
 ### Campaign and navigation
 

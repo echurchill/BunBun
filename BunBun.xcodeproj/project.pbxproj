@@ -35,6 +35,9 @@
 		A1000000000000000000001A /* CampaignState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001E /* CampaignState.swift */; };
 		A1000000000000000000001B /* CampaignPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001F /* CampaignPersistence.swift */; };
 		A1000000000000000000001C /* CampaignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* CampaignTests.swift */; };
+		A1000000000000000000001D /* BackgroundCarrotWorkshop.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* BackgroundCarrotWorkshop.png */; };
+		A1000000000000000000001E /* BackgroundMoonlitGarden.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* BackgroundMoonlitGarden.png */; };
+		A1000000000000000000001F /* BackgroundBirthdayPavilion.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* BackgroundBirthdayPavilion.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +83,9 @@
 		B1000000000000000000001E /* CampaignState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampaignState.swift; sourceTree = "<group>"; };
 		B1000000000000000000001F /* CampaignPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampaignPersistence.swift; sourceTree = "<group>"; };
 		B10000000000000000000020 /* CampaignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CampaignTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* BackgroundCarrotWorkshop.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BackgroundCarrotWorkshop.png; sourceTree = "<group>"; };
+		B10000000000000000000022 /* BackgroundMoonlitGarden.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BackgroundMoonlitGarden.png; sourceTree = "<group>"; };
+		B10000000000000000000023 /* BackgroundBirthdayPavilion.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BackgroundBirthdayPavilion.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -190,6 +196,9 @@
 				B1000000000000000000001A /* BunnyRescueSheet.png */,
 				B1000000000000000000001B /* BunnyDanceTwoStepSheet.png */,
 				B1000000000000000000001C /* BunnyDanceHopSheet.png */,
+				B10000000000000000000021 /* BackgroundCarrotWorkshop.png */,
+				B10000000000000000000022 /* BackgroundMoonlitGarden.png */,
+				B10000000000000000000023 /* BackgroundBirthdayPavilion.png */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -285,6 +294,9 @@
 				A10000000000000000000016 /* BunnyRescueSheet.png in Resources */,
 				A10000000000000000000017 /* BunnyDanceTwoStepSheet.png in Resources */,
 				A10000000000000000000018 /* BunnyDanceHopSheet.png in Resources */,
+				A1000000000000000000001D /* BackgroundCarrotWorkshop.png in Resources */,
+				A1000000000000000000001E /* BackgroundMoonlitGarden.png in Resources */,
+				A1000000000000000000001F /* BackgroundBirthdayPavilion.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

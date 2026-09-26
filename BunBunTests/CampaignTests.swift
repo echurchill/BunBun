@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import BunBun
 
 final class LevelDefinitionTests: XCTestCase {
@@ -41,6 +42,21 @@ final class LevelDefinitionTests: XCTestCase {
         XCTAssertNotEqual(LevelCatalog.bunnyLab.rules, LevelCatalog.moonlightMeadow.rules)
         XCTAssertNotEqual(LevelCatalog.moonlightMeadow.rules, LevelCatalog.danceRehearsal.rules)
         XCTAssertNotEqual(LevelCatalog.bunnyLab.shotSequence, LevelCatalog.danceRehearsal.shotSequence)
+        XCTAssertEqual(LevelCatalog.levels.count, 6)
+        XCTAssertEqual(LevelCatalog.bunnyLab.theme, LevelCatalog.carrotWorks.theme)
+        XCTAssertEqual(LevelCatalog.moonlightMeadow.theme, LevelCatalog.fireflyFalls.theme)
+        XCTAssertEqual(LevelCatalog.danceRehearsal.theme, LevelCatalog.birthdayBash.theme)
+    }
+
+    func testEveryThemeHasABundledBackground() {
+        let themes = Set(LevelCatalog.levels.map(\.theme))
+
+        for theme in themes {
+            XCTAssertNotNil(
+                UIImage(named: theme.backgroundAssetName),
+                "Missing bundled background for \(theme.rawValue)"
+            )
+        }
     }
 }
 
@@ -51,8 +67,8 @@ final class CampaignStateTests: XCTestCase {
         campaign.record(levelID: .bunnyLab, score: 800, result: .won)
 
         XCTAssertTrue(campaign.isCompleted(.bunnyLab))
-        XCTAssertTrue(campaign.isUnlocked(.moonlightMeadow))
-        XCTAssertFalse(campaign.isUnlocked(.danceRehearsal))
+        XCTAssertTrue(campaign.isUnlocked(.carrotWorks))
+        XCTAssertFalse(campaign.isUnlocked(.moonlightMeadow))
     }
 
     func testLosingDoesNotUnlockALevel() {
@@ -79,13 +95,13 @@ final class CampaignStateTests: XCTestCase {
     func testFinalLevelDoesNotUnlockAnInvalidLevel() {
         var campaign = CampaignState(
             unlockedLevels: Set(LevelID.allCases),
-            completedLevels: [.bunnyLab, .moonlightMeadow]
+            completedLevels: Set(LevelID.allCases.dropLast())
         )
 
-        campaign.record(levelID: .danceRehearsal, score: 2_500, result: .won)
+        campaign.record(levelID: .birthdayBash, score: 2_500, result: .won)
 
         XCTAssertEqual(campaign.unlockedLevels, Set(LevelID.allCases))
-        XCTAssertTrue(campaign.isCompleted(.danceRehearsal))
+        XCTAssertTrue(campaign.isCompleted(.birthdayBash))
     }
 
     func testCampaignEncodingRoundTrips() throws {
