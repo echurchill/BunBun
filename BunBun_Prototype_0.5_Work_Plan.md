@@ -183,8 +183,11 @@ Prototype 0.5 is complete when:
 ## Post-0.5 environment and campaign expansion — September 26, 2026
 
 - Expanded the campaign from three to six levels while retaining data-driven rules and sequential unlocking.
-- Grouped the levels into three pairs that deliberately share Carrot Workshop, Moonlit Garden, and Birthday Pavilion backgrounds.
-- Added original AI-generated square environment plates with safe portrait/landscape cropping and a quiet central playfield.
+- Grouped the levels into three pairs that deliberately share Desert Camp, Forest Camp, and Snow Camp backgrounds.
+- Generated one creek-free Forest Camp master, then derived desert and snow edits with matching geometry and an empty lower compositing band.
+- Replaced the red hazard line with a theme-banked animated creek whose current reflects danger.
+- Added safe inner-tube exits for bunnies that reach the creek.
+- Reduced the permanent grid and added aim-path glow, target lift, and a subtle side-dependent formation lean.
 - Added subtle code-driven ambient light glimmers, with a denser and faster lighting pass during dance parties.
 - Added the shared background thumbnails to the level picker so paired stages are visually related.
 

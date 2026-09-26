@@ -16,9 +16,9 @@ enum LevelTheme: String, Codable, Sendable {
 
     var backgroundAssetName: String {
         switch self {
-        case .lab: "BackgroundCarrotWorkshop"
-        case .meadow: "BackgroundMoonlitGarden"
-        case .rehearsal: "BackgroundBirthdayPavilion"
+        case .lab: "BackgroundDesertCamp"
+        case .meadow: "BackgroundForestCamp"
+        case .rehearsal: "BackgroundSnowyWoodland"
         }
     }
 }

@@ -56,7 +56,10 @@ final class GameScene: SKScene {
     private let backgroundLayer = SKNode()
     private let ambientLightLayer = SKNode()
     private let partyLayer = SKNode()
+    private let boardStageLayer = SKNode()
+    private let streamLayer = SKNode()
     private let gridLayer = SKNode()
+    private let aimLayer = SKNode()
     private let bunnyLayer = SKNode()
     private let effectLayer = SKNode()
     private let hudLayer = SKNode()
@@ -96,11 +99,24 @@ final class GameScene: SKScene {
 
     override func didMove(to view: SKView) {
         backgroundColor = themeBackgroundColor
+        backgroundLayer.zPosition = -1_000
+        ambientLightLayer.zPosition = -900
+        partyLayer.zPosition = -800
+        boardStageLayer.zPosition = 0
+        streamLayer.zPosition = -10
+        gridLayer.zPosition = -5
+        aimLayer.zPosition = 1
+        bunnyLayer.zPosition = 5
+        effectLayer.zPosition = 200
+        hudLayer.zPosition = 300
         addChild(backgroundLayer)
         addChild(ambientLightLayer)
         addChild(partyLayer)
-        addChild(gridLayer)
-        addChild(bunnyLayer)
+        addChild(boardStageLayer)
+        boardStageLayer.addChild(streamLayer)
+        boardStageLayer.addChild(gridLayer)
+        boardStageLayer.addChild(aimLayer)
+        boardStageLayer.addChild(bunnyLayer)
         addChild(effectLayer)
         addChild(hudLayer)
         renderAll()
@@ -360,7 +376,7 @@ final class GameScene: SKScene {
             ]))
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let postTransitionWait = outcome.fallenBunnies.isEmpty ? 0.40 : 0.74
+        let postTransitionWait = outcome.fallenBunnies.isEmpty ? 0.40 : 1.85
         run(.sequence([
             .wait(forDuration: 0.56),
             .run { [weak self] in
@@ -375,8 +391,8 @@ final class GameScene: SKScene {
             .run { [weak self] in
                 if !outcome.fallenBunnies.isEmpty {
                     self?.flashMessage(
-                        outcome.fallenBunnies.count == 1 ? "ONE BUNNY FELL" : "\(outcome.fallenBunnies.count) BUNNIES FELL",
-                        color: .systemRed
+                        outcome.fallenBunnies.count == 1 ? "SAFE IN A TUBE!" : "TUBE PARADE!",
+                        color: .systemCyan
                     )
                 }
                 self?.finishAnimation()
@@ -386,6 +402,7 @@ final class GameScene: SKScene {
 
     private func finishAnimation() {
         updateBunnies(state.board)
+        drawStream()
         drawHUD()
         isAnimating = false
         showEndStateIfNeeded()
@@ -400,21 +417,14 @@ final class GameScene: SKScene {
         updateBunnies(oldBoard)
         let newLocations = Dictionary(uniqueKeysWithValues: newBoard.occupants.map { ($0.value.id, $0.key) })
 
-        for (_, bunny) in oldBoard.occupants {
+        for (cell, bunny) in oldBoard.occupants {
             guard let node = bunnyLayer.childNode(withName: "bunny:\(bunny.id.uuidString)") else { continue }
             if let newCell = newLocations[bunny.id] {
                 let action = SKAction.move(to: point(for: newCell), duration: duration)
                 action.timingMode = .easeInEaseOut
                 node.run(action)
             } else if rescuesMissingBunnies, let bunnyNode = node as? BunnyNode {
-                bunnyNode.playRescue()
-                bunnyNode.run(.sequence([
-                    .wait(forDuration: 0.48),
-                    .group([
-                        .moveBy(x: 0, y: cellHeight * 0.72, duration: 0.18),
-                        .fadeOut(withDuration: 0.18)
-                    ])
-                ]))
+                animateTubeRescue(bunnyNode, from: cell)
             } else {
                 node.run(.group([
                     .moveBy(x: 0, y: -cellHeight * 1.2, duration: duration),
@@ -423,17 +433,121 @@ final class GameScene: SKScene {
             }
         }
 
-        let refreshDelay = rescuesMissingBunnies ? max(duration, 0.70) : duration
+        let refreshDelay = rescuesMissingBunnies ? max(duration, 1.75) : duration
         run(.sequence([
             .wait(forDuration: refreshDelay),
             .run { [weak self] in self?.updateBunnies(newBoard, animateEntrants: true) }
         ]))
     }
 
+    private func animateTubeRescue(_ bunny: BunnyNode, from cell: Cell) {
+        let start = point(for: cell)
+        let splashPoint = CGPoint(x: start.x, y: streamCenterY + cellHeight * 0.03)
+        let tube = makeInnerTube(seed: bunny.bunnyID.hashValue)
+        tube.position = CGPoint(x: 0, y: -cellHeight * 0.22)
+        tube.zPosition = -2
+        bunny.addChild(tube)
+        bunny.zPosition = 18
+        bunny.playRescue()
+
+        let enterWater = SKAction.move(to: splashPoint, duration: 0.28)
+        enterWater.timingMode = .easeIn
+
+        let floatPath = CGMutablePath()
+        floatPath.move(to: splashPoint)
+        let exitX = size.width + cellWidth * 1.8
+        let travel = exitX - splashPoint.x
+        floatPath.addCurve(
+            to: CGPoint(x: splashPoint.x + travel * 0.36, y: splashPoint.y + cellHeight * 0.07),
+            control1: CGPoint(x: splashPoint.x + travel * 0.12, y: splashPoint.y + cellHeight * 0.16),
+            control2: CGPoint(x: splashPoint.x + travel * 0.24, y: splashPoint.y - cellHeight * 0.10)
+        )
+        floatPath.addCurve(
+            to: CGPoint(x: splashPoint.x + travel * 0.70, y: splashPoint.y - cellHeight * 0.03),
+            control1: CGPoint(x: splashPoint.x + travel * 0.48, y: splashPoint.y + cellHeight * 0.14),
+            control2: CGPoint(x: splashPoint.x + travel * 0.58, y: splashPoint.y - cellHeight * 0.13)
+        )
+        floatPath.addCurve(
+            to: CGPoint(x: exitX, y: splashPoint.y + cellHeight * 0.05),
+            control1: CGPoint(x: splashPoint.x + travel * 0.80, y: splashPoint.y + cellHeight * 0.13),
+            control2: CGPoint(x: splashPoint.x + travel * 0.92, y: splashPoint.y - cellHeight * 0.08)
+        )
+        let floatAway = SKAction.follow(
+            floatPath,
+            asOffset: false,
+            orientToPath: false,
+            duration: 1.10
+        )
+        floatAway.timingMode = .easeInEaseOut
+
+        tube.run(.repeatForever(.sequence([
+            .rotate(toAngle: 0.07, duration: 0.24, shortestUnitArc: true),
+            .rotate(toAngle: -0.07, duration: 0.30, shortestUnitArc: true)
+        ])), withKey: "tubeBob")
+
+        bunny.run(.sequence([
+            .wait(forDuration: 0.22),
+            .group([enterWater, .scale(to: 0.90, duration: 0.28)]),
+            .run { [weak self] in self?.addWaterSplash(at: splashPoint) },
+            floatAway,
+            .fadeOut(withDuration: 0.10),
+            .removeFromParent()
+        ]))
+    }
+
+    private func makeInnerTube(seed: Int) -> SKNode {
+        let container = SKNode()
+        let palette: [SKColor] = [.systemOrange, .systemPink, .systemYellow, .systemTeal]
+        let index = Int(UInt(bitPattern: seed) % UInt(palette.count))
+        let tube = SKShapeNode(
+            ellipseOf: CGSize(width: cellWidth * 0.92, height: cellHeight * 0.34)
+        )
+        tube.fillColor = palette[index]
+        tube.strokeColor = .white.withAlphaComponent(0.86)
+        tube.lineWidth = max(1.5, cellWidth * 0.08)
+        tube.glowWidth = cellWidth * 0.05
+        container.addChild(tube)
+
+        let opening = SKShapeNode(
+            ellipseOf: CGSize(width: cellWidth * 0.43, height: cellHeight * 0.15)
+        )
+        opening.fillColor = SKColor(red: 0.04, green: 0.30, blue: 0.50, alpha: 0.82)
+        opening.strokeColor = SKColor(white: 1, alpha: 0.54)
+        opening.lineWidth = 1
+        opening.zPosition = 1
+        container.addChild(opening)
+        return container
+    }
+
+    private func addWaterSplash(at position: CGPoint) {
+        for index in 0..<7 {
+            let drop = SKShapeNode(circleOfRadius: max(1.5, cellWidth * 0.055))
+            drop.position = position
+            drop.fillColor = SKColor(red: 0.60, green: 0.93, blue: 1, alpha: 0.92)
+            drop.strokeColor = .clear
+            drop.zPosition = 31
+            effectLayer.addChild(drop)
+            let angle = CGFloat.pi * (0.16 + 0.68 * CGFloat(index) / 6)
+            let distance = cellWidth * (0.45 + CGFloat(index % 3) * 0.16)
+            drop.run(.sequence([
+                .group([
+                    .moveBy(
+                        x: cos(angle) * distance,
+                        y: sin(angle) * distance,
+                        duration: 0.28
+                    ),
+                    .fadeOut(withDuration: 0.28)
+                ]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
     private func renderAll() {
         guard size.width > 0, size.height > 0 else { return }
         layoutBackground()
         layoutBoard()
+        drawStream()
         drawGrid()
         updateBunnies(state.board)
         updateAimReactions()
@@ -465,7 +579,7 @@ final class GameScene: SKScene {
 
         let shade = SKShapeNode(rectOf: size)
         shade.position = CGPoint(x: size.width / 2, y: size.height / 2)
-        shade.fillColor = SKColor(white: 0, alpha: isTabletLayout ? 0.48 : 0.42)
+        shade.fillColor = SKColor(white: 0, alpha: isTabletLayout ? 0.34 : 0.30)
         shade.strokeColor = .clear
         shade.zPosition = -99
         backgroundLayer.addChild(shade)
@@ -574,6 +688,16 @@ final class GameScene: SKScene {
             x: (size.width - boardWidth) / 2,
             y: (size.height - boardHeight) / 2 - (isTabletLayout ? 10 : 6)
         )
+
+        let boardCenter = CGPoint(
+            x: boardOrigin.x + boardWidth / 2,
+            y: boardOrigin.y + boardHeight / 2
+        )
+        boardStageLayer.position = boardCenter
+        let childOffset = CGPoint(x: -boardCenter.x, y: -boardCenter.y)
+        for layer in [streamLayer, gridLayer, aimLayer, bunnyLayer] {
+            layer.position = childOffset
+        }
     }
 
     private var boardWidth: CGFloat {
@@ -595,31 +719,156 @@ final class GameScene: SKScene {
                     selectedSide == .bottom ? lane == column : lane == row
                 } ?? false
 
-                let slot = SKShapeNode(
-                    rectOf: CGSize(width: cellWidth - 2, height: cellHeight - 2),
-                    cornerRadius: 5
-                )
+                let slotSize = isOutside
+                    ? CGSize(width: cellWidth - 3, height: cellHeight - 4)
+                    : CGSize(width: cellWidth * 0.62, height: max(4, cellHeight * 0.15))
+                let slot = SKShapeNode(rectOf: slotSize, cornerRadius: slotSize.height / 2)
                 slot.position = point(for: cell)
+                if !isOutside {
+                    slot.position.y -= cellHeight * 0.27
+                }
                 slot.fillColor = isHighlighted
-                    ? SKColor(red: 0.26, green: 0.30, blue: 0.39, alpha: 1)
+                    ? SKColor.systemYellow.withAlphaComponent(isOutside ? 0.18 : 0.11)
                     : isOutside
-                        ? SKColor(red: 0.16, green: 0.13, blue: 0.24, alpha: 1)
-                        : SKColor(red: 0.12, green: 0.16, blue: 0.23, alpha: 1)
+                        ? SKColor(red: 0.17, green: 0.12, blue: 0.25, alpha: 0.56)
+                        : SKColor(white: 0.05, alpha: 0.12)
                 slot.strokeColor = isHighlighted
-                    ? .systemYellow.withAlphaComponent(0.85)
+                    ? .systemYellow.withAlphaComponent(isOutside ? 0.92 : 0.28)
                     : isOutside
-                        ? SKColor(red: 0.55, green: 0.35, blue: 0.72, alpha: 0.7)
-                        : SKColor(white: 0.28, alpha: 0.7)
-                slot.lineWidth = isHighlighted ? 2 : 1
+                        ? SKColor(red: 0.65, green: 0.43, blue: 0.82, alpha: 0.62)
+                        : SKColor(white: 0.92, alpha: 0.09)
+                slot.lineWidth = isHighlighted && isOutside ? 2 : 0.8
                 gridLayer.addChild(slot)
             }
         }
+    }
 
-        let hazard = SKShapeNode(rectOf: CGSize(width: boardWidth, height: 5), cornerRadius: 2)
-        hazard.position = CGPoint(x: boardOrigin.x + boardWidth / 2, y: boardOrigin.y - 8)
-        hazard.fillColor = .systemRed
-        hazard.strokeColor = .clear
-        gridLayer.addChild(hazard)
+    private var streamCenterY: CGFloat {
+        boardOrigin.y - max(15, cellHeight * 0.48)
+    }
+
+    private func drawStream() {
+        streamLayer.removeAllChildren()
+
+        let dangerFraction = min(
+            1,
+            CGFloat(state.danger) / CGFloat(max(state.rules.dangerLimit, 1))
+        )
+        let streamHeight = max(26, cellHeight * 0.82)
+        let streamWidth = size.width + cellWidth * 1.2
+        let center = CGPoint(x: boardOrigin.x + boardWidth / 2, y: streamCenterY)
+
+        let bank = SKShapeNode(path: creekPath(
+            center: center,
+            width: streamWidth + 9,
+            height: streamHeight + 10,
+            wobble: streamHeight * 0.16
+        ))
+        bank.fillColor = streamBankColor
+        bank.strokeColor = SKColor(white: 1, alpha: 0.25)
+        bank.lineWidth = 1.2
+        bank.zPosition = -3
+        streamLayer.addChild(bank)
+
+        let water = SKShapeNode(path: creekPath(
+            center: center,
+            width: streamWidth,
+            height: streamHeight,
+            wobble: streamHeight * 0.13
+        ))
+        water.fillColor = SKColor(
+            red: 0.05 + dangerFraction * 0.05,
+            green: 0.48 - dangerFraction * 0.08,
+            blue: 0.76 + dangerFraction * 0.08,
+            alpha: 0.94
+        )
+        water.strokeColor = SKColor(red: 0.48, green: 0.90, blue: 1, alpha: 0.82)
+        water.lineWidth = 2
+        water.glowWidth = 2 + dangerFraction * 3
+        water.zPosition = -2
+        streamLayer.addChild(water)
+
+        let waveCount = 7 + Int(dangerFraction * 5)
+        let flowDuration = max(0.7, 1.65 - TimeInterval(dangerFraction) * 0.72)
+        for index in 0..<waveCount {
+            let width = cellWidth * (0.38 + CGFloat(index % 3) * 0.13)
+            let wave = SKShapeNode(
+                rectOf: CGSize(width: width, height: max(1.5, streamHeight * 0.075)),
+                cornerRadius: streamHeight * 0.04
+            )
+            let usableWidth = max(1, streamWidth - width)
+            wave.position = CGPoint(
+                x: center.x - streamWidth / 2 + CGFloat(index) / CGFloat(max(waveCount - 1, 1)) * usableWidth,
+                y: center.y + CGFloat((index * 11) % 17) / 17 * streamHeight * 0.54 - streamHeight * 0.27
+            )
+            wave.fillColor = SKColor(white: 1, alpha: 0.34 + dangerFraction * 0.18)
+            wave.strokeColor = .clear
+            wave.zPosition = -1
+            streamLayer.addChild(wave)
+            wave.run(.repeatForever(.sequence([
+                .moveBy(x: cellWidth * 0.55, y: 0, duration: flowDuration),
+                .moveBy(x: -cellWidth * 0.55, y: 0, duration: 0)
+            ])))
+        }
+
+    }
+
+    private func creekPath(
+        center: CGPoint,
+        width: CGFloat,
+        height: CGFloat,
+        wobble: CGFloat
+    ) -> CGPath {
+        let left = center.x - width / 2
+        let right = center.x + width / 2
+        let top = center.y + height / 2
+        let bottom = center.y - height / 2
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: left, y: top - wobble * 0.25))
+        path.addCurve(
+            to: CGPoint(x: left + width * 0.34, y: top + wobble * 0.30),
+            control1: CGPoint(x: left + width * 0.10, y: top + wobble),
+            control2: CGPoint(x: left + width * 0.24, y: top - wobble * 0.65)
+        )
+        path.addCurve(
+            to: CGPoint(x: left + width * 0.68, y: top - wobble * 0.18),
+            control1: CGPoint(x: left + width * 0.45, y: top + wobble * 0.72),
+            control2: CGPoint(x: left + width * 0.58, y: top - wobble * 0.82)
+        )
+        path.addCurve(
+            to: CGPoint(x: right, y: top + wobble * 0.12),
+            control1: CGPoint(x: left + width * 0.79, y: top + wobble * 0.52),
+            control2: CGPoint(x: left + width * 0.91, y: top - wobble * 0.55)
+        )
+        path.addLine(to: CGPoint(x: right, y: bottom - wobble * 0.18))
+        path.addCurve(
+            to: CGPoint(x: left + width * 0.66, y: bottom + wobble * 0.16),
+            control1: CGPoint(x: left + width * 0.90, y: bottom - wobble * 0.74),
+            control2: CGPoint(x: left + width * 0.78, y: bottom + wobble * 0.68)
+        )
+        path.addCurve(
+            to: CGPoint(x: left + width * 0.31, y: bottom - wobble * 0.24),
+            control1: CGPoint(x: left + width * 0.55, y: bottom - wobble * 0.64),
+            control2: CGPoint(x: left + width * 0.43, y: bottom + wobble * 0.78)
+        )
+        path.addCurve(
+            to: CGPoint(x: left, y: bottom + wobble * 0.10),
+            control1: CGPoint(x: left + width * 0.20, y: bottom - wobble * 0.82),
+            control2: CGPoint(x: left + width * 0.08, y: bottom + wobble * 0.72)
+        )
+        path.closeSubpath()
+        return path
+    }
+
+    private var streamBankColor: SKColor {
+        switch level.theme {
+        case .lab:
+            SKColor(red: 0.76, green: 0.58, blue: 0.34, alpha: 0.92)
+        case .meadow:
+            SKColor(red: 0.24, green: 0.43, blue: 0.20, alpha: 0.94)
+        case .rehearsal:
+            SKColor(red: 0.73, green: 0.84, blue: 0.92, alpha: 0.95)
+        }
     }
 
     private func updateBunnies(_ board: Board, animateEntrants: Bool = false) {
@@ -839,7 +1088,7 @@ final class GameScene: SKScene {
     }
 
     private func updateAimReactions() {
-        let reactingCells: Set<Cell>
+        let orderedCells: [Cell]
         if let highlightedLane {
             let candidates = state.board.occupants.keys.filter { cell in
                 selectedSide == .bottom
@@ -856,10 +1105,15 @@ final class GameScene: SKScene {
                     lhs.column > rhs.column
                 }
             }
-            reactingCells = Set(ordered.prefix(3))
+            orderedCells = Array(ordered.prefix(3))
         } else {
-            reactingCells = []
+            orderedCells = []
         }
+
+        let reactingCells = Set(orderedCells)
+        let destinationCell = orderedCells.first
+        drawAimGuide(to: destinationCell)
+        updateBoardLean()
 
         for (cell, bunny) in state.board.occupants {
             guard let node = bunnyLayer.childNode(
@@ -867,7 +1121,93 @@ final class GameScene: SKScene {
             ) as? BunnyNode else { continue }
 
             node.setAiming(reactingCells.contains(cell))
+            node.removeAction(forKey: "aimPull")
+            let basePosition = point(for: cell)
+            let isDestination = cell == destinationCell
+            let destination = isDestination
+                ? CGPoint(
+                    x: basePosition.x + aimPullOffset.dx,
+                    y: basePosition.y + aimPullOffset.dy
+                )
+                : basePosition
+            let move = SKAction.move(to: destination, duration: 0.13)
+            move.timingMode = .easeOut
+            let scale = SKAction.scale(to: isDestination ? 1.07 : 1, duration: 0.13)
+            node.zPosition = isDestination ? 12 : 2
+            node.run(.group([move, scale]), withKey: "aimPull")
         }
+    }
+
+    private var aimPullOffset: CGVector {
+        switch selectedSide {
+        case .left:
+            CGVector(dx: -cellWidth * 0.13, dy: cellHeight * 0.09)
+        case .right:
+            CGVector(dx: cellWidth * 0.13, dy: cellHeight * 0.09)
+        case .bottom:
+            CGVector(dx: 0, dy: -cellHeight * 0.07)
+        }
+    }
+
+    private func drawAimGuide(to destinationCell: Cell?) {
+        aimLayer.removeAllChildren()
+        guard let lane = highlightedLane else { return }
+
+        let start = projectileStartPosition(for: selectedSide, lane: lane)
+        let fallback: CGPoint = switch selectedSide {
+        case .left:
+            point(for: Cell(column: state.board.columnCount - 1, row: lane))
+        case .right:
+            point(for: Cell(column: 0, row: lane))
+        case .bottom:
+            point(for: Cell(column: lane, row: state.board.rowCount - 1))
+        }
+        let end = destinationCell.map(point(for:)) ?? fallback
+
+        let path = CGMutablePath()
+        path.move(to: start)
+        path.addLine(to: end)
+        let beam = SKShapeNode(path: path)
+        beam.strokeColor = SKColor(red: 1, green: 0.96, blue: 0.60, alpha: 0.25)
+        beam.lineWidth = max(2, cellWidth * 0.12)
+        beam.glowWidth = cellWidth * 0.28
+        beam.zPosition = 0
+        aimLayer.addChild(beam)
+
+        for index in 0..<9 {
+            let progress = CGFloat(index + 1) / 9
+            let spot = SKShapeNode(circleOfRadius: cellWidth * (0.08 + progress * 0.10))
+            spot.position = CGPoint(
+                x: start.x + (end.x - start.x) * progress,
+                y: start.y + (end.y - start.y) * progress
+            )
+            spot.fillColor = SKColor(
+                red: 1,
+                green: 0.94,
+                blue: 0.48,
+                alpha: 0.035 + progress * 0.12
+            )
+            spot.strokeColor = .clear
+            spot.glowWidth = cellWidth * progress * 0.16
+            spot.zPosition = 1
+            aimLayer.addChild(spot)
+        }
+    }
+
+    private func updateBoardLean() {
+        let angle: CGFloat
+        if highlightedLane == nil {
+            angle = 0
+        } else {
+            angle = switch selectedSide {
+            case .left: -0.018
+            case .right: 0.018
+            case .bottom: 0
+            }
+        }
+        let rotate = SKAction.rotate(toAngle: angle, duration: 0.15, shortestUnitArc: true)
+        rotate.timingMode = .easeOut
+        boardStageLayer.run(rotate, withKey: "aimLean")
     }
 
     private func point(for cell: Cell) -> CGPoint {

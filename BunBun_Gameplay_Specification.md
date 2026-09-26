@@ -283,7 +283,7 @@ The blue bunny concept is now used as real prototype presentation art while rema
 - Bunnies in the highlighted aiming lane react to the player's attention.
 - Matched bunnies celebrate before leaving the board, with stronger timing and scale on deeper chains.
 - Bomb and line bunnies use different wind-ups and badge motion before their effects fire.
-- Survivors react before Classic advancement, while bunnies reaching the hazard perform a safe comic rescue instead of simply falling off-screen.
+- Survivors react before Classic advancement, while bunnies reaching the hazard splash into bright inner tubes and safely float off to the right instead of falling or disappearing.
 - Active dance parties choose among three stable per-bunny dance loops.
 - Special-bunny badges and effects remain presentation overlays, keeping the same character animation reusable for normal, bomb, and line bunnies.
 
@@ -307,9 +307,14 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 
 ### Shared environment presentation
 
-- Six levels are grouped into three two-level environment sets: Carrot Workshop, Moonlit Garden, and Birthday Pavilion.
+- Six levels are grouped into three two-level environment sets: Desert Camp, Forest Camp, and Snow Camp.
+- The Forest Camp plate is the composition master; desert and snow variants preserve its camera, horizon, quiet center, prop placement, and clear lower hazard band.
 - Square environment plates use aspect-fill cropping so they work on portrait iPhone and portrait or landscape iPad.
-- The central playfield is intentionally darkened for bunny and grid readability.
+- Background plates contain no water. SpriteKit composites the animated creek at the hazard edge so it remains consistent, readable, and tunable across themes.
+- The old red hazard line is replaced by a wide creek with theme-colored banks and a current that becomes faster and brighter as danger increases.
+- The interior grid is reduced to faint ground markers; the visible outside boxes remain as direct side controls.
+- Touching a launcher draws a soft brightening path toward the destination, lifts the lead bunny toward the shot, and gives the formation a subtle left/right lean.
+- The central playfield is gently darkened for bunny readability while keeping the natural setting visible.
 - A deterministic subset of background lights glimmers slowly during normal play.
 - Dance parties activate more background lights, brighter colors, and a quicker pulse while leaving gameplay geometry unchanged.
 

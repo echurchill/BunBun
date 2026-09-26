@@ -172,9 +172,9 @@ private struct LevelSelectionView: View {
 
     private func themeColor(_ theme: LevelTheme) -> Color {
         switch theme {
-        case .lab: .blue
-        case .meadow: .teal
-        case .rehearsal: .purple
+        case .lab: .orange
+        case .meadow: .green
+        case .rehearsal: .cyan
         }
     }
 }

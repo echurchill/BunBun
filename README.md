@@ -2,7 +2,7 @@
 
 Prototype 0.5 of an original, Boogie Bunnies-inspired birthday game for Beth.
 
-Open `BunBun.xcodeproj`, select the `BunBun` scheme, and run on an iPhone, iPad, or simulator. Choose an unlocked level, then tap or drag across a purple box on either side to launch through that row, or touch the invisible launch region below a column to launch upward. This build includes six data-driven levels, persistent campaign progress and best scores, level-specific tuning, red bomb bunnies, purple row/column bunnies, cascading special effects, progress pressure, dance parties, generated prototype bunny animation, and three reusable generated environment backgrounds.
+Open `BunBun.xcodeproj`, select the `BunBun` scheme, and run on an iPhone, iPad, or simulator. Choose an unlocked level, then tap or drag across a purple box on either side to launch through that row, or touch the invisible launch region below a column to launch upward. This build includes six data-driven levels, persistent campaign progress and best scores, level-specific tuning, red bomb bunnies, purple row/column bunnies, cascading special effects, progress pressure, dance parties, generated prototype bunny animation, a composited animated creek, and three reusable generated environment backgrounds.
 
 The source is split into:
 
@@ -16,7 +16,7 @@ The source is split into:
 
 The level picker and game board adapt separately for phones and tablets. The app target supports both iPhone and iPad, including portrait and landscape layouts; the iPad board uses larger cells and HUD spacing while retaining the same rules and direct edge controls.
 
-The six levels are grouped into three two-level environment sets: Carrot Workshop, Moonlit Garden, and Birthday Pavilion. Each background uses subtle staggered light glimmers during ordinary play; dance parties activate more lights with brighter colors and a quicker rhythm.
+The six levels are grouped into three two-level environment sets: Desert Camp, Forest Camp, and Snow Camp. All three share one master composition with a deliberately empty lower band; SpriteKit adds the moving creek there at runtime. Bunnies that reach it splash into bright inner tubes and safely float out to the right. The board uses faint ground markers instead of a heavy grid, and side aiming adds a soft path glow, target lift, and subtle formation lean. Background lights glimmer gently during ordinary play and become brighter and quicker during dance parties.
 
 The generated source artwork remains untouched in `Mockup Images`. Prototype 0.4 now uses ten eight-frame sheets: staggered personality-driven idle, aim reaction, match celebration, nervous board advancement, distinct bomb and line anticipation, safe rescue, and three dance-party loops.
 
