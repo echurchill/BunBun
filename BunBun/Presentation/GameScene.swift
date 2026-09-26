@@ -67,6 +67,7 @@ final class GameScene: SKScene {
     private var boardOrigin = CGPoint.zero
     private var cellWidth: CGFloat = 24
     private var cellHeight: CGFloat = 34
+    private var backgroundImageFrame = CGRect.zero
 
     private var isTabletLayout: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
@@ -560,7 +561,7 @@ final class GameScene: SKScene {
     private func layoutBackground() {
         backgroundLayer.removeAllChildren()
 
-        let texture = SKTexture(imageNamed: level.theme.backgroundAssetName)
+        let texture = SKTexture(imageNamed: level.backgroundAssetName)
         texture.filteringMode = .linear
         let textureSize = texture.size()
         guard textureSize.width > 0, textureSize.height > 0 else { return }
@@ -576,100 +577,319 @@ final class GameScene: SKScene {
         image.position = CGPoint(x: size.width / 2, y: size.height / 2)
         image.zPosition = -100
         backgroundLayer.addChild(image)
+        backgroundImageFrame = image.frame
 
         let shade = SKShapeNode(rectOf: size)
         shade.position = CGPoint(x: size.width / 2, y: size.height / 2)
-        shade.fillColor = SKColor(white: 0, alpha: isTabletLayout ? 0.34 : 0.30)
+        shade.fillColor = SKColor(white: 0, alpha: backgroundShadeAlpha)
         shade.strokeColor = .clear
         shade.zPosition = -99
         backgroundLayer.addChild(shade)
 
-        configureAmbientLights(danceMode: showsDanceParty)
+        configureEnvironmentEffects(danceMode: showsDanceParty)
     }
 
-    private func configureAmbientLights(danceMode: Bool) {
-        ambientLightLayer.removeAllChildren()
-        let positions = ambientLightPositions
-        let seed = level.id.rawValue.unicodeScalars.reduce(0) { $0 + Int($1.value) }
-        let ordered = positions.indices.sorted {
-            (($0 * 17 + seed) % 37) < (($1 * 17 + seed) % 37)
+    private var backgroundShadeAlpha: CGFloat {
+        switch level.environment {
+        case .desertCamp: isTabletLayout ? 0.31 : 0.27
+        case .forestCampDay: isTabletLayout ? 0.30 : 0.26
+        case .forestCampNight: isTabletLayout ? 0.16 : 0.12
+        case .snowyWoodland: isTabletLayout ? 0.34 : 0.30
         }
-        let lightCount = min(danceMode ? 14 : 6, positions.count)
+    }
 
-        for (order, index) in ordered.prefix(lightCount).enumerated() {
-            let normalized = positions[index]
-            let radius = CGFloat(3 + (index + seed) % 4) * (isTabletLayout ? 1.25 : 1)
-            let light = SKShapeNode(circleOfRadius: radius)
-            light.position = CGPoint(x: normalized.x * size.width, y: normalized.y * size.height)
-            light.fillColor = ambientLightColor(index: index, danceMode: danceMode)
-            light.strokeColor = .white.withAlphaComponent(danceMode ? 0.38 : 0.20)
-            light.lineWidth = 1
-            light.glowWidth = radius * (danceMode ? 3.2 : 2.1)
-            light.blendMode = .add
-            light.alpha = 0.10
-            light.zPosition = -80
-            ambientLightLayer.addChild(light)
+    private func configureEnvironmentEffects(danceMode: Bool) {
+        ambientLightLayer.removeAllChildren()
+        switch level.environment {
+        case .desertCamp:
+            addDesertDust(danceMode: danceMode)
+        case .forestCampDay:
+            addFireflies(danceMode: danceMode)
+            addCampfire(danceMode: danceMode)
+        case .forestCampNight:
+            addStarTwinkles(danceMode: danceMode)
+            addLanternGlows(danceMode: danceMode)
+            addFriendlyTreeEyes(danceMode: danceMode)
+            addFireflies(danceMode: danceMode)
+            addCampfire(danceMode: danceMode)
+        case .snowyWoodland:
+            addSnowfall(danceMode: danceMode)
+            addWinterSparkles(danceMode: danceMode)
+        }
+    }
 
-            let delay = Double((index * 11 + seed + order * 3) % 19) * 0.09
-            let brighten = danceMode ? 0.74 : 0.42
-            let dim = danceMode ? 0.16 : 0.08
-            let rise = danceMode ? 0.18 + Double(index % 3) * 0.04 : 0.42 + Double(index % 4) * 0.08
-            let fall = danceMode ? 0.24 + Double(index % 4) * 0.04 : 0.55 + Double(index % 3) * 0.10
-            light.run(.sequence([
-                .wait(forDuration: delay),
+    private func backgroundPoint(x: CGFloat, yFromTop: CGFloat) -> CGPoint {
+        CGPoint(
+            x: backgroundImageFrame.minX + x * backgroundImageFrame.width,
+            y: backgroundImageFrame.maxY - yFromTop * backgroundImageFrame.height
+        )
+    }
+
+    private func addPulsingGlow(
+        at position: CGPoint,
+        radius: CGFloat,
+        color: SKColor,
+        delay: TimeInterval,
+        danceMode: Bool
+    ) {
+        let light = SKShapeNode(circleOfRadius: radius)
+        light.position = position
+        light.fillColor = color
+        light.strokeColor = color.withAlphaComponent(0.42)
+        light.lineWidth = 0.8
+        light.glowWidth = radius * (danceMode ? 3.4 : 2.3)
+        light.blendMode = .add
+        light.alpha = 0.08
+        ambientLightLayer.addChild(light)
+        light.run(.sequence([
+            .wait(forDuration: delay),
+            .repeatForever(.sequence([
+                .group([
+                    .fadeAlpha(to: danceMode ? 0.78 : 0.46, duration: danceMode ? 0.20 : 0.55),
+                    .scale(to: danceMode ? 1.18 : 1.08, duration: danceMode ? 0.20 : 0.55)
+                ]),
+                .group([
+                    .fadeAlpha(to: danceMode ? 0.18 : 0.10, duration: danceMode ? 0.28 : 0.70),
+                    .scale(to: 0.90, duration: danceMode ? 0.28 : 0.70)
+                ]),
+                .wait(forDuration: danceMode ? 0.06 : 0.30)
+            ]))
+        ]))
+    }
+
+    private func addStarTwinkles(danceMode: Bool) {
+        let anchors = [
+            CGPoint(x: 0.26, y: 0.91), CGPoint(x: 0.34, y: 0.86),
+            CGPoint(x: 0.43, y: 0.94), CGPoint(x: 0.55, y: 0.88),
+            CGPoint(x: 0.66, y: 0.93), CGPoint(x: 0.75, y: 0.84),
+            CGPoint(x: 0.48, y: 0.80), CGPoint(x: 0.59, y: 0.77)
+        ]
+        let count = danceMode ? anchors.count : 4
+        for (index, point) in anchors.prefix(count).enumerated() {
+            addPulsingGlow(
+                at: CGPoint(x: point.x * size.width, y: point.y * size.height),
+                radius: isTabletLayout ? 2.6 : 1.8,
+                color: SKColor(white: 1, alpha: 0.88),
+                delay: Double(index) * 0.17,
+                danceMode: danceMode
+            )
+        }
+    }
+
+    private func addLanternGlows(danceMode: Bool) {
+        let anchors = [
+            backgroundPoint(x: 0.064, yFromTop: 0.214),
+            backgroundPoint(x: 0.908, yFromTop: 0.115),
+            backgroundPoint(x: 0.795, yFromTop: 0.220)
+        ]
+        for (index, point) in anchors.enumerated()
+        where point.x > -20 && point.x < size.width + 20 {
+            addPulsingGlow(
+                at: point,
+                radius: (isTabletLayout ? 7 : 5) + CGFloat(index),
+                color: SKColor(red: 1, green: 0.60, blue: 0.16, alpha: 0.72),
+                delay: Double(index) * 0.31,
+                danceMode: danceMode
+            )
+        }
+    }
+
+    private func addFriendlyTreeEyes(danceMode: Bool) {
+        let anchors = [
+            CGPoint(x: 0.10, y: 0.69), CGPoint(x: 0.91, y: 0.64),
+            CGPoint(x: 0.18, y: 0.79), CGPoint(x: 0.83, y: 0.75)
+        ]
+        let count = danceMode ? anchors.count : 2
+        for (index, anchor) in anchors.prefix(count).enumerated() {
+            let pair = SKNode()
+            pair.position = CGPoint(x: anchor.x * size.width, y: anchor.y * size.height)
+            pair.alpha = 0
+            for direction in [-1.0, 1.0] {
+                let eye = SKShapeNode(ellipseOf: CGSize(width: 3.2, height: 5.2))
+                eye.position.x = CGFloat(direction) * 4.2
+                eye.fillColor = SKColor(red: 1, green: 0.70, blue: 0.20, alpha: 0.86)
+                eye.strokeColor = .clear
+                eye.glowWidth = 3
+                pair.addChild(eye)
+            }
+            ambientLightLayer.addChild(pair)
+            pair.run(.sequence([
+                .wait(forDuration: 0.9 + Double(index) * 0.7),
                 .repeatForever(.sequence([
-                    .fadeAlpha(to: brighten, duration: rise),
-                    .fadeAlpha(to: dim, duration: fall),
-                    .wait(forDuration: danceMode ? 0.08 : 0.35 + Double(index % 5) * 0.16)
+                    .fadeAlpha(to: danceMode ? 0.82 : 0.50, duration: 0.35),
+                    .wait(forDuration: danceMode ? 0.65 : 1.45),
+                    .scaleY(to: 0.08, duration: 0.08),
+                    .scaleY(to: 1, duration: 0.10),
+                    .wait(forDuration: danceMode ? 0.45 : 1.6),
+                    .fadeOut(withDuration: 0.45),
+                    .wait(forDuration: danceMode ? 0.6 : 2.2)
                 ]))
             ]))
         }
     }
 
-    private var ambientLightPositions: [CGPoint] {
-        switch level.theme {
-        case .lab:
-            [
-                CGPoint(x: 0.08, y: 0.84), CGPoint(x: 0.18, y: 0.69),
-                CGPoint(x: 0.32, y: 0.78), CGPoint(x: 0.68, y: 0.76),
-                CGPoint(x: 0.82, y: 0.68), CGPoint(x: 0.93, y: 0.84),
-                CGPoint(x: 0.11, y: 0.48), CGPoint(x: 0.89, y: 0.49),
-                CGPoint(x: 0.22, y: 0.91), CGPoint(x: 0.78, y: 0.91),
-                CGPoint(x: 0.15, y: 0.24), CGPoint(x: 0.85, y: 0.25),
-                CGPoint(x: 0.38, y: 0.66), CGPoint(x: 0.62, y: 0.66),
-                CGPoint(x: 0.50, y: 0.82), CGPoint(x: 0.50, y: 0.18)
-            ]
-        case .meadow:
-            [
-                CGPoint(x: 0.08, y: 0.76), CGPoint(x: 0.17, y: 0.61),
-                CGPoint(x: 0.29, y: 0.82), CGPoint(x: 0.72, y: 0.78),
-                CGPoint(x: 0.84, y: 0.60), CGPoint(x: 0.94, y: 0.74),
-                CGPoint(x: 0.12, y: 0.38), CGPoint(x: 0.88, y: 0.40),
-                CGPoint(x: 0.23, y: 0.26), CGPoint(x: 0.77, y: 0.25),
-                CGPoint(x: 0.36, y: 0.70), CGPoint(x: 0.64, y: 0.67),
-                CGPoint(x: 0.42, y: 0.48), CGPoint(x: 0.58, y: 0.52),
-                CGPoint(x: 0.34, y: 0.34), CGPoint(x: 0.68, y: 0.35)
-            ]
-        case .rehearsal:
-            [
-                CGPoint(x: 0.08, y: 0.91), CGPoint(x: 0.18, y: 0.94),
-                CGPoint(x: 0.30, y: 0.92), CGPoint(x: 0.42, y: 0.95),
-                CGPoint(x: 0.58, y: 0.95), CGPoint(x: 0.70, y: 0.92),
-                CGPoint(x: 0.82, y: 0.94), CGPoint(x: 0.92, y: 0.91),
-                CGPoint(x: 0.10, y: 0.69), CGPoint(x: 0.90, y: 0.69),
-                CGPoint(x: 0.18, y: 0.52), CGPoint(x: 0.82, y: 0.52),
-                CGPoint(x: 0.28, y: 0.77), CGPoint(x: 0.72, y: 0.77),
-                CGPoint(x: 0.39, y: 0.84), CGPoint(x: 0.61, y: 0.84)
-            ]
+    private func addFireflies(danceMode: Bool) {
+        let count = danceMode ? 14 : 7
+        for index in 0..<count {
+            let x = CGFloat((index * 37 + 18) % 88 + 6) / 100
+            let y = CGFloat((index * 23 + 31) % 42 + 33) / 100
+            let radius: CGFloat = isTabletLayout ? 3.2 : 2.2
+            let firefly = SKShapeNode(circleOfRadius: radius)
+            firefly.position = CGPoint(x: x * size.width, y: y * size.height)
+            firefly.fillColor = SKColor(red: 0.92, green: 1, blue: 0.30, alpha: 0.86)
+            firefly.strokeColor = SKColor(white: 1, alpha: 0.38)
+            firefly.lineWidth = 0.7
+            firefly.glowWidth = radius * (danceMode ? 3.4 : 2.4)
+            firefly.blendMode = .add
+            firefly.alpha = 0.08
+            ambientLightLayer.addChild(firefly)
+
+            let bright: CGFloat = danceMode ? 0.84 : 0.54
+            let dim: CGFloat = danceMode ? 0.18 : 0.10
+            let blinkDuration = danceMode ? 0.12 : 0.24
+            let flicker = SKAction.repeat(.sequence([
+                .fadeAlpha(to: bright, duration: blinkDuration),
+                .fadeAlpha(to: dim, duration: blinkDuration * 1.25)
+            ]), count: 2 + index % 2)
+            let dx = CGFloat((index % 3) - 1) * (danceMode ? 24 : 15)
+                + CGFloat(index % 2 == 0 ? 7 : -7)
+            let dy = CGFloat(index % 2 == 0 ? 1 : -1) * (danceMode ? 17 : 10)
+            let secondDX = CGFloat(index % 2 == 0 ? -18 : 18)
+            let secondDY = CGFloat(index % 3 - 1) * (danceMode ? 13 : 8)
+            let moveDuration = danceMode ? 0.42 : 0.78
+            let relocate = { (x: CGFloat, y: CGFloat) in
+                SKAction.group([
+                    .moveBy(x: x, y: y, duration: moveDuration),
+                    .fadeAlpha(to: 0.06, duration: moveDuration * 0.45)
+                ])
+            }
+            firefly.run(.sequence([
+                .wait(forDuration: Double(index % 5) * 0.16),
+                .repeatForever(.sequence([
+                    flicker,
+                    relocate(dx, dy),
+                    flicker,
+                    relocate(secondDX, secondDY),
+                    flicker,
+                    relocate(-dx - secondDX, -dy - secondDY),
+                    .wait(forDuration: danceMode ? 0.08 : 0.35)
+                ]))
+            ]))
         }
     }
 
-    private func ambientLightColor(index: Int, danceMode: Bool) -> SKColor {
-        guard danceMode else {
-            return level.theme == .meadow ? .systemYellow : .white
+    private func addCampfire(danceMode: Bool) {
+        let fire = SKNode()
+        fire.position = backgroundPoint(x: 0.755, yFromTop: 0.245)
+        fire.setScale(isTabletLayout ? 1.45 : 1)
+
+        for angle in [-0.34, 0.34] {
+            let log = SKShapeNode(rectOf: CGSize(width: 30, height: 6), cornerRadius: 3)
+            log.zRotation = angle
+            log.fillColor = SKColor(red: 0.24, green: 0.10, blue: 0.04, alpha: 0.95)
+            log.strokeColor = SKColor(red: 0.55, green: 0.25, blue: 0.08, alpha: 0.9)
+            fire.addChild(log)
         }
-        let colors: [SKColor] = [.systemPink, .systemYellow, .systemBlue, .systemPurple, .systemGreen]
-        return colors[index % colors.count]
+        let glow = SKShapeNode(circleOfRadius: danceMode ? 25 : 19)
+        glow.fillColor = SKColor(red: 1, green: 0.30, blue: 0.04, alpha: 0.12)
+        glow.strokeColor = .clear
+        glow.glowWidth = 16
+        glow.blendMode = .add
+        glow.zPosition = -1
+        fire.addChild(glow)
+        for (index, spec) in [(22.0, SKColor.systemOrange), (14.0, SKColor.systemYellow)].enumerated() {
+            let flame = SKShapeNode(ellipseOf: CGSize(width: CGFloat(spec.0) * 0.72, height: CGFloat(spec.0)))
+            flame.position.y = CGFloat(8 + index * 2)
+            flame.fillColor = spec.1.withAlphaComponent(0.88)
+            flame.strokeColor = .clear
+            flame.blendMode = .add
+            fire.addChild(flame)
+            flame.run(.repeatForever(.sequence([
+                .group([.scaleX(to: 0.74, duration: 0.16), .scaleY(to: 1.13, duration: 0.16)]),
+                .group([.scaleX(to: 1.08, duration: 0.20), .scaleY(to: 0.88, duration: 0.20)])
+            ])))
+        }
+        ambientLightLayer.addChild(fire)
+
+        for index in 0..<(danceMode ? 5 : 3) {
+            let smoke = SKShapeNode(circleOfRadius: CGFloat(5 + index % 2 * 2))
+            smoke.position = CGPoint(
+                x: fire.position.x + CGFloat(index - 2) * 3 * fire.xScale,
+                y: fire.position.y + 28 * fire.yScale
+            )
+            smoke.fillColor = SKColor(white: 0.76, alpha: 0.20)
+            smoke.strokeColor = .clear
+            ambientLightLayer.addChild(smoke)
+            let rise = CGFloat(42 + index * 7)
+            smoke.run(.sequence([
+                .wait(forDuration: Double(index) * 0.32),
+                .repeatForever(.sequence([
+                    .group([
+                        .moveBy(x: CGFloat(index % 2 == 0 ? -8 : 8), y: rise, duration: danceMode ? 1.15 : 1.8),
+                        .fadeOut(withDuration: danceMode ? 1.15 : 1.8),
+                        .scale(to: 1.8, duration: danceMode ? 1.15 : 1.8)
+                    ]),
+                    .moveBy(x: CGFloat(index % 2 == 0 ? 8 : -8), y: -rise, duration: 0),
+                    .scale(to: 1, duration: 0),
+                    .fadeAlpha(to: 0.20, duration: 0)
+                ]))
+            ]))
+        }
+    }
+
+    private func addDesertDust(danceMode: Bool) {
+        let count = danceMode ? 12 : 6
+        for index in 0..<count {
+            let mote = SKShapeNode(circleOfRadius: CGFloat(1 + index % 3))
+            mote.position = CGPoint(
+                x: CGFloat((index * 53 + 21) % 94 + 3) / 100 * size.width,
+                y: CGFloat((index * 29 + 18) % 54 + 22) / 100 * size.height
+            )
+            mote.fillColor = SKColor(red: 1, green: 0.78, blue: 0.42, alpha: 0.24)
+            mote.strokeColor = .clear
+            ambientLightLayer.addChild(mote)
+            let travel = danceMode ? size.width * 0.13 : size.width * 0.07
+            mote.run(.repeatForever(.sequence([
+                .group([.moveBy(x: travel, y: 5, duration: danceMode ? 0.9 : 1.8), .fadeAlpha(to: 0.48, duration: 0.5)]),
+                .group([.moveBy(x: -travel, y: -5, duration: danceMode ? 1.0 : 2.0), .fadeAlpha(to: 0.12, duration: 0.7)])
+            ])))
+        }
+    }
+
+    private func addSnowfall(danceMode: Bool) {
+        let count = danceMode ? 22 : 11
+        for index in 0..<count {
+            let flake = SKShapeNode(circleOfRadius: CGFloat(1 + index % 3))
+            flake.position = CGPoint(
+                x: CGFloat((index * 47 + 13) % 96 + 2) / 100 * size.width,
+                y: CGFloat((index * 31 + 20) % 68 + 26) / 100 * size.height
+            )
+            flake.fillColor = SKColor(white: 1, alpha: 0.46)
+            flake.strokeColor = .clear
+            ambientLightLayer.addChild(flake)
+            let fall = danceMode ? size.height * 0.08 : size.height * 0.05
+            flake.run(.repeatForever(.sequence([
+                .moveBy(x: CGFloat(index % 2 == 0 ? 9 : -9), y: -fall, duration: danceMode ? 0.8 : 1.6),
+                .moveBy(x: CGFloat(index % 2 == 0 ? -9 : 9), y: fall, duration: 0)
+            ])))
+        }
+    }
+
+    private func addWinterSparkles(danceMode: Bool) {
+        let anchors = [
+            CGPoint(x: 0.08, y: 0.74), CGPoint(x: 0.18, y: 0.85),
+            CGPoint(x: 0.82, y: 0.82), CGPoint(x: 0.93, y: 0.70),
+            CGPoint(x: 0.33, y: 0.91), CGPoint(x: 0.69, y: 0.92)
+        ]
+        for (index, anchor) in anchors.prefix(danceMode ? anchors.count : 3).enumerated() {
+            addPulsingGlow(
+                at: CGPoint(x: anchor.x * size.width, y: anchor.y * size.height),
+                radius: isTabletLayout ? 3.5 : 2.5,
+                color: SKColor(red: 0.68, green: 0.91, blue: 1, alpha: 0.76),
+                delay: Double(index) * 0.24,
+                danceMode: danceMode
+            )
+        }
     }
 
     private func layoutBoard() {
@@ -715,9 +935,12 @@ final class GameScene: SKScene {
             for column in 0..<state.board.columnCount {
                 let cell = Cell(column: column, row: row)
                 let isOutside = Board.outsideColumns.contains(column)
-                let isHighlighted = highlightedLane.map { lane in
+                let isSelectedSideSlot = !isOutside
+                    || selectedSide == .left && column == 0
+                    || selectedSide == .right && column == state.board.columnCount - 1
+                let isHighlighted = isSelectedSideSlot && (highlightedLane.map { lane in
                     selectedSide == .bottom ? lane == column : lane == row
-                } ?? false
+                } ?? false)
 
                 let slotSize = isOutside
                     ? CGSize(width: cellWidth - 3, height: cellHeight - 4)
@@ -728,16 +951,16 @@ final class GameScene: SKScene {
                     slot.position.y -= cellHeight * 0.27
                 }
                 slot.fillColor = isHighlighted
-                    ? SKColor.systemYellow.withAlphaComponent(isOutside ? 0.18 : 0.11)
+                    ? SKColor.systemYellow.withAlphaComponent(isOutside ? 0.09 : 0.11)
                     : isOutside
-                        ? SKColor(red: 0.17, green: 0.12, blue: 0.25, alpha: 0.56)
+                        ? .clear
                         : SKColor(white: 0.05, alpha: 0.12)
                 slot.strokeColor = isHighlighted
                     ? .systemYellow.withAlphaComponent(isOutside ? 0.92 : 0.28)
                     : isOutside
-                        ? SKColor(red: 0.65, green: 0.43, blue: 0.82, alpha: 0.62)
+                        ? SKColor(red: 0.77, green: 0.68, blue: 0.88, alpha: 0.24)
                         : SKColor(white: 0.92, alpha: 0.09)
-                slot.lineWidth = isHighlighted && isOutside ? 2 : 0.8
+                slot.lineWidth = isOutside ? (isHighlighted ? 1.8 : 0.85) : 0.8
                 gridLayer.addChild(slot)
             }
         }
@@ -1351,14 +1574,14 @@ final class GameScene: SKScene {
     private func applyDancePartyTransition(_ outcome: TurnOutcome) {
         if outcome.dancePartyStarted {
             showsDanceParty = true
-            configureAmbientLights(danceMode: true)
+            configureEnvironmentEffects(danceMode: true)
             configureDancePartyBackdrop()
             updateBunnies(outcome.boardAfterResolution)
             flashMessage("DANCE PARTY!  2×", color: .systemYellow)
             addConfetti(for: 3)
         } else if outcome.dancePartyEnded {
             showsDanceParty = false
-            configureAmbientLights(danceMode: false)
+            configureEnvironmentEffects(danceMode: false)
             partyLayer.removeAllChildren()
             backgroundColor = themeBackgroundColor
         }

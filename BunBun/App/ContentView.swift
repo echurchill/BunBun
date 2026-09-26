@@ -115,7 +115,7 @@ private struct LevelSelectionView: View {
         } label: {
             HStack(spacing: 15) {
                 ZStack {
-                    Image(level.theme.backgroundAssetName)
+                    Image(level.backgroundAssetName)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 58, height: 68)

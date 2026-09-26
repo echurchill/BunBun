@@ -48,15 +48,22 @@ final class LevelDefinitionTests: XCTestCase {
         XCTAssertEqual(LevelCatalog.danceRehearsal.theme, LevelCatalog.birthdayBash.theme)
     }
 
-    func testEveryThemeHasABundledBackground() {
-        let themes = Set(LevelCatalog.levels.map(\.theme))
-
-        for theme in themes {
+    func testEveryEnvironmentHasABundledBackground() {
+        for environment in LevelEnvironment.allCases {
             XCTAssertNotNil(
-                UIImage(named: theme.backgroundAssetName),
-                "Missing bundled background for \(theme.rawValue)"
+                UIImage(named: environment.backgroundAssetName),
+                "Missing bundled background for \(environment.rawValue)"
             )
         }
+    }
+
+    func testEnvironmentProfilesStayIndependentFromRulesThemes() {
+        XCTAssertEqual(LevelCatalog.bunnyLab.environment, .desertCamp)
+        XCTAssertEqual(LevelCatalog.carrotWorks.environment, .desertCamp)
+        XCTAssertEqual(LevelCatalog.moonlightMeadow.environment, .forestCampNight)
+        XCTAssertEqual(LevelCatalog.fireflyFalls.environment, .forestCampNight)
+        XCTAssertEqual(LevelCatalog.danceRehearsal.environment, .snowyWoodland)
+        XCTAssertEqual(LevelCatalog.birthdayBash.environment, .snowyWoodland)
     }
 }
 

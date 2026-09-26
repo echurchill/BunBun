@@ -13,12 +13,20 @@ enum LevelTheme: String, Codable, Sendable {
     case lab
     case meadow
     case rehearsal
+}
+
+enum LevelEnvironment: String, CaseIterable, Codable, Sendable {
+    case desertCamp
+    case forestCampDay
+    case forestCampNight
+    case snowyWoodland
 
     var backgroundAssetName: String {
         switch self {
-        case .lab: "BackgroundDesertCamp"
-        case .meadow: "BackgroundForestCamp"
-        case .rehearsal: "BackgroundSnowyWoodland"
+        case .desertCamp: "BackgroundDesertCamp"
+        case .forestCampDay: "BackgroundForestCamp"
+        case .forestCampNight: "BackgroundForestCampNight"
+        case .snowyWoodland: "BackgroundSnowyWoodland"
         }
     }
 }
@@ -62,6 +70,7 @@ struct LevelDefinition: Equatable, Sendable {
     let displayName: String
     let subtitle: String
     let theme: LevelTheme
+    let environment: LevelEnvironment
     let rules: GameRules
     let startingLayout: [Cell: PrototypeShot]
     let shotSequence: [PrototypeShot]
@@ -71,6 +80,10 @@ struct LevelDefinition: Equatable, Sendable {
     let arrivalColorStride: Int
     let arrivalTurnStride: Int
     let tutorialPrompts: [String]
+
+    var backgroundAssetName: String {
+        environment.backgroundAssetName
+    }
 
     func startingBoard() -> Board {
         var board = Board()
@@ -130,6 +143,7 @@ enum LevelCatalog {
         displayName: "Bunny Lab",
         subtitle: "Learn the three-sided board",
         theme: .lab,
+        environment: .desertCamp,
         rules: .bunnyLab,
         startingLayout: layout([
             7: [1: .orange, 2: .pink, 3: .green, 4: .purple, 5: .blue,
@@ -174,6 +188,7 @@ enum LevelCatalog {
         displayName: "Moonlight Meadow",
         subtitle: "Plan around denser arrivals",
         theme: .meadow,
+        environment: .forestCampNight,
         rules: GameRules(
             launchesPerAdvance: 3,
             progressTarget: 90,
@@ -226,6 +241,7 @@ enum LevelCatalog {
         displayName: "Carrot Works",
         subtitle: "Keep the workshop humming",
         theme: .lab,
+        environment: .desertCamp,
         rules: GameRules(
             launchesPerAdvance: 3,
             progressTarget: 105,
@@ -279,6 +295,7 @@ enum LevelCatalog {
         displayName: "Dance Rehearsal",
         subtitle: "Build parties while pressure rises",
         theme: .rehearsal,
+        environment: .snowyWoodland,
         rules: GameRules(
             launchesPerAdvance: 2,
             progressTarget: 80,
@@ -330,6 +347,7 @@ enum LevelCatalog {
         displayName: "Firefly Falls",
         subtitle: "Find chains beneath the moon",
         theme: .meadow,
+        environment: .forestCampNight,
         rules: GameRules(
             launchesPerAdvance: 3,
             progressTarget: 95,
@@ -383,6 +401,7 @@ enum LevelCatalog {
         displayName: "Birthday Bash",
         subtitle: "Fill the floor for Beth's finale",
         theme: .rehearsal,
+        environment: .snowyWoodland,
         rules: GameRules(
             launchesPerAdvance: 2,
             progressTarget: 75,

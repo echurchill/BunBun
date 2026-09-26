@@ -38,6 +38,7 @@
 		A10000000000000000000020 /* BackgroundDesertCamp.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* BackgroundDesertCamp.png */; };
 		A10000000000000000000021 /* BackgroundForestCamp.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* BackgroundForestCamp.png */; };
 		A10000000000000000000022 /* BackgroundSnowyWoodland.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* BackgroundSnowyWoodland.png */; };
+		A10000000000000000000023 /* BackgroundForestCampNight.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* BackgroundForestCampNight.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,6 +90,7 @@
 		B10000000000000000000024 /* BackgroundDesertCamp.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BackgroundDesertCamp.png; sourceTree = "<group>"; };
 		B10000000000000000000025 /* BackgroundForestCamp.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BackgroundForestCamp.png; sourceTree = "<group>"; };
 		B10000000000000000000026 /* BackgroundSnowyWoodland.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BackgroundSnowyWoodland.png; sourceTree = "<group>"; };
+		B10000000000000000000027 /* BackgroundForestCampNight.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = BackgroundForestCampNight.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -205,6 +207,7 @@
 				B10000000000000000000024 /* BackgroundDesertCamp.png */,
 				B10000000000000000000025 /* BackgroundForestCamp.png */,
 				B10000000000000000000026 /* BackgroundSnowyWoodland.png */,
+				B10000000000000000000027 /* BackgroundForestCampNight.png */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -303,6 +306,7 @@
 				A10000000000000000000020 /* BackgroundDesertCamp.png in Resources */,
 				A10000000000000000000021 /* BackgroundForestCamp.png in Resources */,
 				A10000000000000000000022 /* BackgroundSnowyWoodland.png in Resources */,
+				A10000000000000000000023 /* BackgroundForestCampNight.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

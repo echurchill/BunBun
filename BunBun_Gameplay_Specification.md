@@ -307,7 +307,7 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 
 ### Shared environment presentation
 
-- Six levels are grouped into three two-level environment sets: Desert Camp, Forest Camp, and Snow Camp.
+- Six levels are grouped into three two-level environment sets: Desert Camp, Midnight Forest Camp, and Snow Camp.
 - The Forest Camp plate is the composition master; desert and snow variants preserve its camera, horizon, quiet center, prop placement, and clear lower hazard band.
 - Square environment plates use aspect-fill cropping so they work on portrait iPhone and portrait or landscape iPad.
 - Background plates contain no water. SpriteKit composites the animated creek at the hazard edge so it remains consistent, readable, and tunable across themes.
@@ -315,8 +315,9 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 - The interior grid is reduced to faint ground markers; the visible outside boxes remain as direct side controls.
 - Touching a launcher draws a soft brightening path toward the destination, lifts the lead bunny toward the shot, and gives the formation a subtle left/right lean.
 - The central playfield is gently darkened for bunny readability while keeping the natural setting visible.
-- A deterministic subset of background lights glimmers slowly during normal play.
-- Dance parties activate more background lights, brighter colors, and a quicker pulse while leaving gameplay geometry unchanged.
+- Background motion is environment-specific and layered behind play: desert dust, midnight stars/lanterns/tree eyes/relocating fireflies/tent-side campfire smoke, and snow with icy glints.
+- Dance parties activate more environmental particles, brighter glows, and quicker motion while leaving gameplay geometry unchanged.
+- Outside launcher cells are outline-only at rest; the selected side receives a restrained fill and brighter outline as aiming feedback.
 
 ### Campaign and navigation
 
