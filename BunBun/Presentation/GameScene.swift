@@ -385,7 +385,8 @@ final class GameScene: SKScene {
                     from: outcome.boardAfterResolution,
                     to: outcome.boardAfterTurn,
                     duration: 0.34,
-                    rescuesMissingBunnies: !outcome.fallenBunnies.isEmpty
+                    rescuesMissingBunnies: !outcome.fallenBunnies.isEmpty,
+                    animatesEntrants: true
                 )
             },
             .wait(forDuration: postTransitionWait),
@@ -413,7 +414,8 @@ final class GameScene: SKScene {
         from oldBoard: Board,
         to newBoard: Board,
         duration: TimeInterval,
-        rescuesMissingBunnies: Bool = false
+        rescuesMissingBunnies: Bool = false,
+        animatesEntrants: Bool = false
     ) {
         updateBunnies(oldBoard)
         let newLocations = Dictionary(uniqueKeysWithValues: newBoard.occupants.map { ($0.value.id, $0.key) })
@@ -437,7 +439,9 @@ final class GameScene: SKScene {
         let refreshDelay = rescuesMissingBunnies ? max(duration, 1.75) : duration
         run(.sequence([
             .wait(forDuration: refreshDelay),
-            .run { [weak self] in self?.updateBunnies(newBoard, animateEntrants: true) }
+            .run { [weak self] in
+                self?.updateBunnies(newBoard, animateEntrants: animatesEntrants)
+            }
         ]))
     }
 
