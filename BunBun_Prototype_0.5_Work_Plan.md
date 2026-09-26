@@ -175,6 +175,8 @@ Prototype 0.5 is complete when:
 - Added a native SwiftUI level picker plus Next Level, Replay, Retry, Levels, and confirmed reset flows.
 - Added separate placeholder color treatments and short level-introduction transitions.
 - Added native iPad support, responsive tablet board/HUD sizing, and constrained large-screen menu width.
+- Declared all four iPad orientations while keeping iPhone play portrait-only.
+- Added an automatic end-of-run playtest summary for launches, falls, special activations, dance parties, elapsed time, and final score.
 - Verified the level picker and gameplay on iPhone and on a 13-inch iPad simulator in portrait and landscape. A direct side-box match succeeded in iPad landscape.
 - Expanded the suite from 21 to 28 passing tests.
 

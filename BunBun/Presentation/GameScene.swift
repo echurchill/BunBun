@@ -2,6 +2,36 @@ import SpriteKit
 import UIKit
 
 final class GameScene: SKScene {
+    private struct PlaytestRunStats {
+        private let startedAt = Date()
+        private var endedAt: Date?
+        private(set) var launches = 0
+        private(set) var falls = 0
+        private(set) var specialActivations = 0
+        private(set) var danceParties = 0
+
+        mutating func record(_ outcome: TurnOutcome) {
+            launches += 1
+            falls += outcome.fallenBunnies.count
+            specialActivations += outcome.chain?.stages.reduce(0) {
+                $0 + $1.specialActivations.count
+            } ?? 0
+            if outcome.dancePartyStarted {
+                danceParties += 1
+            }
+        }
+
+        mutating func finish() {
+            if endedAt == nil {
+                endedAt = Date()
+            }
+        }
+
+        var elapsedSeconds: Int {
+            max(0, Int((endedAt ?? Date()).timeIntervalSince(startedAt).rounded()))
+        }
+    }
+
     private struct LaunchTarget {
         let side: LaunchSide
         let lane: Int
@@ -21,6 +51,7 @@ final class GameScene: SKScene {
     private var showsDebug = false
     private var showsDanceParty = false
     private var didReportCompletion = false
+    private var playtestStats = PlaytestRunStats()
 
     private let partyLayer = SKNode()
     private let gridLayer = SKNode()
@@ -137,6 +168,7 @@ final class GameScene: SKScene {
             lane: lane,
             newBackRow: newRow
         )
+        playtestStats.record(outcome)
         currentShotIndex += 1
         highlightedLane = nil
         isAnimating = true
@@ -880,7 +912,8 @@ final class GameScene: SKScene {
 
     private func showEndStateIfNeeded() {
         guard state.status != .playing else { return }
-        let panelHeight: CGFloat = state.status == .won ? 176 : 154
+        playtestStats.finish()
+        let panelHeight: CGFloat = state.status == .won ? 250 : 222
         let panel = SKShapeNode(
             rectOf: CGSize(width: min(isTabletLayout ? 420 : 330, size.width - 38), height: panelHeight),
             cornerRadius: 18
@@ -901,27 +934,45 @@ final class GameScene: SKScene {
         panel.addChild(title)
 
         let prompt = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
-        prompt.text = state.status == .won ? "Score \(state.score)" : "The bunnies are ready to try again"
+        prompt.text = state.status == .won
+            ? "Score \(state.score)"
+            : "Score \(state.score)  •  Ready to try again"
         prompt.fontSize = 12
         prompt.fontColor = SKColor(white: 0.75, alpha: 1)
         prompt.verticalAlignmentMode = .center
         prompt.position.y = panelHeight / 2 - 64
         panel.addChild(prompt)
 
+        let activity = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
+        activity.text = "Launches \(playtestStats.launches)  •  Falls \(playtestStats.falls)"
+        activity.fontSize = 11
+        activity.fontColor = SKColor(white: 0.82, alpha: 1)
+        activity.verticalAlignmentMode = .center
+        activity.position.y = panelHeight / 2 - 90
+        panel.addChild(activity)
+
+        let events = SKLabelNode(fontNamed: "AvenirNext-Medium")
+        events.text = "Specials \(playtestStats.specialActivations)  •  Parties \(playtestStats.danceParties)  •  \(playtestStats.elapsedSeconds)s"
+        events.fontSize = 10
+        events.fontColor = SKColor(white: 0.68, alpha: 1)
+        events.verticalAlignmentMode = .center
+        events.position.y = panelHeight / 2 - 111
+        panel.addChild(events)
+
         if state.status == .won {
             if hasNextLevel {
-                addEndButton(to: panel, name: "next", text: "NEXT LEVEL", y: 4)
+                addEndButton(to: panel, name: "next", text: "NEXT LEVEL", y: -24)
             }
-            addEndButton(to: panel, name: "replay", text: "REPLAY", y: hasNextLevel ? -35 : -7)
-            addEndButton(to: panel, name: "levels", text: "LEVELS", y: hasNextLevel ? -70 : -48)
+            addEndButton(to: panel, name: "replay", text: "REPLAY", y: hasNextLevel ? -62 : -38)
+            addEndButton(to: panel, name: "levels", text: "LEVELS", y: hasNextLevel ? -100 : -80)
             addConfetti(for: 5)
             if !didReportCompletion {
                 didReportCompletion = true
                 onLevelCompleted(level.id, state.score)
             }
         } else {
-            addEndButton(to: panel, name: "replay", text: "RETRY", y: -1)
-            addEndButton(to: panel, name: "levels", text: "LEVELS", y: -43)
+            addEndButton(to: panel, name: "replay", text: "RETRY", y: -43)
+            addEndButton(to: panel, name: "levels", text: "LEVELS", y: -83)
         }
     }
 
@@ -1004,6 +1055,7 @@ final class GameScene: SKScene {
         isAnimating = false
         showsDanceParty = false
         didReportCompletion = false
+        playtestStats = PlaytestRunStats()
         partyLayer.removeAllChildren()
         backgroundColor = themeBackgroundColor
         renderAll()
