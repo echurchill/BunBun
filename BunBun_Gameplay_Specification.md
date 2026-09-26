@@ -310,8 +310,8 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 - Six levels are grouped into three two-level environment sets: Desert Camp, Midnight Forest Camp, and Snow Camp.
 - The Forest Camp plate is the composition master; desert and snow variants preserve its camera, horizon, quiet center, prop placement, and clear lower hazard band.
 - Square environment plates use aspect-fill cropping so they work on portrait iPhone and portrait or landscape iPad.
-- Background plates contain no water. SpriteKit composites the animated creek at the hazard edge so it remains consistent, readable, and tunable across themes.
-- The old red hazard line is replaced by a wide creek with theme-colored banks and a current that becomes faster and brighter as danger increases.
+- Background plates contain no water. SpriteKit composites a separate transparent rendered creek at the hazard edge so it remains consistent, readable, and tunable across themes.
+- The old red hazard line is replaced by a wide rendered creek with theme-colored banks plus live highlights, tint, glow, and current that intensify as danger increases.
 - The interior grid is reduced to faint ground markers; the visible outside boxes remain as direct side controls.
 - Touching a launcher draws a soft brightening path toward the destination, lifts the lead bunny toward the shot, and gives the formation a subtle left/right lean.
 - The central playfield is gently darkened for bunny readability while keeping the natural setting visible.

@@ -57,6 +57,10 @@ final class LevelDefinitionTests: XCTestCase {
         }
     }
 
+    func testRenderedCreekPlateIsBundled() {
+        XCTAssertNotNil(UIImage(named: "CreekWaterRendered"))
+    }
+
     func testEnvironmentProfilesStayIndependentFromRulesThemes() {
         XCTAssertEqual(LevelCatalog.bunnyLab.environment, .desertCamp)
         XCTAssertEqual(LevelCatalog.carrotWorks.environment, .desertCamp)

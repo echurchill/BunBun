@@ -985,7 +985,8 @@ final class GameScene: SKScene {
             center: center,
             width: streamWidth + 9,
             height: streamHeight + 10,
-            wobble: streamHeight * 0.16
+            wobble: streamHeight * 0.16,
+            boardFacingWobble: streamHeight * 0.025
         ))
         bank.fillColor = streamBankColor
         bank.strokeColor = SKColor(white: 1, alpha: 0.25)
@@ -993,23 +994,54 @@ final class GameScene: SKScene {
         bank.zPosition = -3
         streamLayer.addChild(bank)
 
-        let water = SKShapeNode(path: creekPath(
+        let renderedWater = SKTexture(imageNamed: "CreekWaterRendered")
+        renderedWater.filteringMode = .linear
+        let waterBand = SKTexture(
+            rect: CGRect(x: 0, y: 0.40, width: 1, height: 0.20),
+            in: renderedWater
+        )
+        waterBand.filteringMode = .linear
+        let water = SKSpriteNode(
+            texture: waterBand,
+            size: CGSize(width: streamWidth + cellWidth, height: streamHeight * 1.10)
+        )
+        water.position = center
+        water.color = streamWaterTint(dangerFraction: dangerFraction)
+        water.colorBlendFactor = streamWaterTintStrength(dangerFraction: dangerFraction)
+        water.alpha = 0.96
+        let waterCrop = SKCropNode()
+        let waterMask = SKShapeNode(path: creekPath(
             center: center,
             width: streamWidth,
             height: streamHeight,
-            wobble: streamHeight * 0.13
+            wobble: streamHeight * 0.13,
+            boardFacingWobble: streamHeight * 0.018
         ))
-        water.fillColor = SKColor(
-            red: 0.05 + dangerFraction * 0.05,
-            green: 0.48 - dangerFraction * 0.08,
-            blue: 0.76 + dangerFraction * 0.08,
-            alpha: 0.94
+        waterMask.fillColor = .white
+        waterMask.strokeColor = .clear
+        waterCrop.maskNode = waterMask
+        waterCrop.zPosition = -2
+        waterCrop.addChild(water)
+        streamLayer.addChild(waterCrop)
+
+        let waterEdge = SKShapeNode(path: creekPath(
+            center: center,
+            width: streamWidth,
+            height: streamHeight,
+            wobble: streamHeight * 0.13,
+            boardFacingWobble: streamHeight * 0.018
+        ))
+        waterEdge.fillColor = .clear
+        waterEdge.strokeColor = SKColor(
+            red: 0.48 + dangerFraction * 0.18,
+            green: 0.90 - dangerFraction * 0.22,
+            blue: 1,
+            alpha: 0.60 + dangerFraction * 0.22
         )
-        water.strokeColor = SKColor(red: 0.48, green: 0.90, blue: 1, alpha: 0.82)
-        water.lineWidth = 2
-        water.glowWidth = 2 + dangerFraction * 3
-        water.zPosition = -2
-        streamLayer.addChild(water)
+        waterEdge.lineWidth = 1.4 + dangerFraction * 1.3
+        waterEdge.glowWidth = 1.5 + dangerFraction * 3.5
+        waterEdge.zPosition = -1.5
+        streamLayer.addChild(waterEdge)
 
         let waveCount = 7 + Int(dangerFraction * 5)
         let flowDuration = max(0.7, 1.65 - TimeInterval(dangerFraction) * 0.72)
@@ -1026,8 +1058,8 @@ final class GameScene: SKScene {
             )
             wave.fillColor = SKColor(white: 1, alpha: 0.34 + dangerFraction * 0.18)
             wave.strokeColor = .clear
-            wave.zPosition = -1
-            streamLayer.addChild(wave)
+            wave.zPosition = 1
+            waterCrop.addChild(wave)
             wave.run(.repeatForever(.sequence([
                 .moveBy(x: cellWidth * 0.55, y: 0, duration: flowDuration),
                 .moveBy(x: -cellWidth * 0.55, y: 0, duration: 0)
@@ -1040,28 +1072,30 @@ final class GameScene: SKScene {
         center: CGPoint,
         width: CGFloat,
         height: CGFloat,
-        wobble: CGFloat
+        wobble: CGFloat,
+        boardFacingWobble: CGFloat? = nil
     ) -> CGPath {
         let left = center.x - width / 2
         let right = center.x + width / 2
         let top = center.y + height / 2
         let bottom = center.y - height / 2
+        let topWobble = boardFacingWobble ?? wobble
         let path = CGMutablePath()
-        path.move(to: CGPoint(x: left, y: top - wobble * 0.25))
+        path.move(to: CGPoint(x: left, y: top - topWobble * 0.25))
         path.addCurve(
-            to: CGPoint(x: left + width * 0.34, y: top + wobble * 0.30),
-            control1: CGPoint(x: left + width * 0.10, y: top + wobble),
-            control2: CGPoint(x: left + width * 0.24, y: top - wobble * 0.65)
+            to: CGPoint(x: left + width * 0.34, y: top + topWobble * 0.30),
+            control1: CGPoint(x: left + width * 0.10, y: top + topWobble),
+            control2: CGPoint(x: left + width * 0.24, y: top - topWobble * 0.65)
         )
         path.addCurve(
-            to: CGPoint(x: left + width * 0.68, y: top - wobble * 0.18),
-            control1: CGPoint(x: left + width * 0.45, y: top + wobble * 0.72),
-            control2: CGPoint(x: left + width * 0.58, y: top - wobble * 0.82)
+            to: CGPoint(x: left + width * 0.68, y: top - topWobble * 0.18),
+            control1: CGPoint(x: left + width * 0.45, y: top + topWobble * 0.72),
+            control2: CGPoint(x: left + width * 0.58, y: top - topWobble * 0.82)
         )
         path.addCurve(
-            to: CGPoint(x: right, y: top + wobble * 0.12),
-            control1: CGPoint(x: left + width * 0.79, y: top + wobble * 0.52),
-            control2: CGPoint(x: left + width * 0.91, y: top - wobble * 0.55)
+            to: CGPoint(x: right, y: top + topWobble * 0.12),
+            control1: CGPoint(x: left + width * 0.79, y: top + topWobble * 0.52),
+            control2: CGPoint(x: left + width * 0.91, y: top - topWobble * 0.55)
         )
         path.addLine(to: CGPoint(x: right, y: bottom - wobble * 0.18))
         path.addCurve(
@@ -1092,6 +1126,34 @@ final class GameScene: SKScene {
         case .rehearsal:
             SKColor(red: 0.73, green: 0.84, blue: 0.92, alpha: 0.95)
         }
+    }
+
+    private func streamWaterTint(dangerFraction: CGFloat) -> SKColor {
+        switch level.environment {
+        case .desertCamp:
+            SKColor(
+                red: 0.10 + dangerFraction * 0.12,
+                green: 0.62 - dangerFraction * 0.10,
+                blue: 0.82 + dangerFraction * 0.08,
+                alpha: 1
+            )
+        case .forestCampDay:
+            SKColor(red: 0.07, green: 0.54, blue: 0.72, alpha: 1)
+        case .forestCampNight:
+            SKColor(
+                red: 0.02 + dangerFraction * 0.10,
+                green: 0.24 - dangerFraction * 0.05,
+                blue: 0.44 + dangerFraction * 0.10,
+                alpha: 1
+            )
+        case .snowyWoodland:
+            SKColor(red: 0.44, green: 0.78, blue: 0.91, alpha: 1)
+        }
+    }
+
+    private func streamWaterTintStrength(dangerFraction: CGFloat) -> CGFloat {
+        let base: CGFloat = level.environment == .forestCampNight ? 0.38 : 0.18
+        return min(0.52, base + dangerFraction * 0.14)
     }
 
     private func updateBunnies(_ board: Board, animateEntrants: Bool = false) {
