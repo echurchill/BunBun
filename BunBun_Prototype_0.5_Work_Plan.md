@@ -206,6 +206,18 @@ The remaining completion gate is hands-on playtesting of all three levels on phy
 
 Remaining television checks are hands-on remote navigation, a complete level playthrough, and final viewing-distance tuning on an unlocked simulator or physical Apple TV. App Store icons and Top Shelf artwork are release work, not part of this feasibility milestone.
 
+## Adaptive audio vertical slice — September 26, 2026
+
+- Added a presentation-only `AudioDirector` shared by the iPhone/iPad and Apple TV targets.
+- Added four synchronized music stems that crossfade with danger and dance-party state without restarting the loop.
+- Added preloaded cues for launches, blocks, matches, chains, both special types, advancement, creek rescues, dance starts, wins, and gentle losses.
+- Added persistent master mute plus independent music and effects volume controls to the level picker.
+- Added a deterministic Swift audio generator, all generated WAV resources, and a full-mix listening preview.
+- Kept every game-rule type audio-free and documented a filename/timing contract for replacing the procedural sketch with final production stems.
+- Verified successful iOS and tvOS builds, resource embedding, Apple TV simulator launch, remote level selection, a scoring match, and active Core Audio playback queues.
+
+Remaining audio work is subjective listening and mix tuning on physical iPhone, iPad, and Apple TV speakers; longer fatigue testing; gapless-loop confirmation; and selection or production of the final licensed score.
+
 ## Recommended implementation order
 
 1. Introduce `LevelDefinition` and migrate Bunny Lab with no intended behavior change.

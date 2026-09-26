@@ -118,3 +118,53 @@ Do not call a track final until we can answer all of these:
 4. Is the exact license and provenance archived in the repository or private project records?
 5. Can we revise the melody, stems, and loop point without returning to the generator?
 6. Does the final music feel like BunBun rather than an imitation of Boogie Bunnies or a generic AI track?
+
+## Implemented prototype audio — September 26, 2026
+
+The first adaptive audio vertical slice is now playable on iPhone, iPad, and Apple TV. It is deliberately replaceable: game rules know nothing about sound, while `AudioDirector` translates presentation events and meter state into music and effects.
+
+### Prototype score
+
+- The score is an original 116-BPM, 4/4, C-major electro-funk loop lasting 16 bars (about 33.1 seconds).
+- Four sample-aligned mono WAV stems start together and remain running together: base groove, melodic hook, pressure percussion, and dance sweetener.
+- The base and hook play during normal puzzle play.
+- The pressure stem fades in on a curved response to the danger meter rather than switching on abruptly.
+- Dance parties crossfade in brighter claps and a counter-melody without restarting or losing the beat.
+- A full-mix `BunBunThemePreview.wav` is retained beside the stems for quick listening outside the game.
+
+The prototype score and effects are generated deterministically by `Tools/make_audio_assets.swift`. They contain no sampled commercial recording, no copied melody, no artist imitation, and no dependency on an AI-service license. Running this command regenerates the complete set:
+
+```sh
+swift Tools/make_audio_assets.swift
+```
+
+This procedural version is a musical sketch, not the final birthday soundtrack. Its main job is to validate tempo, layering, repetition, event timing, and the amount of sonic space needed for gameplay cues before money is spent on a final source.
+
+### Event sound map
+
+| Game event | Prototype cue |
+| --- | --- |
+| Bunny launch | Rising rubbery whoosh |
+| Blocked launch | Short descending bonk |
+| First match | C-major three-note sparkle |
+| Deeper chain | Faster rising arpeggio, pitched slightly higher by depth |
+| Bomb special | Cartoon low boom and noise burst |
+| Line special | Bright upward sweep |
+| Classic advancement | Compact hop cue |
+| Creek rescue | Splash followed by a gentle rising whistle |
+| Dance-party start | Ascending chord and claps |
+| Level complete | Longer major-key flourish |
+| Level lost | Gentle descending phrase with a hopeful final note |
+
+### Runtime behavior and controls
+
+- `AudioDirector` lives in the presentation layer; `Board`, `MatchEngine`, `ChainResolver`, and `GameState` remain pure Swift and audio-free.
+- Effects are preloaded when a level starts to avoid first-use latency during a match.
+- The audio session uses the ambient category, respects the hardware mute policy, and mixes with other audio instead of forcibly taking over the device.
+- Apple TV Play/Pause pauses and resumes the synchronized music players with the SpriteKit scene.
+- The level picker stores independent music and effects volumes plus a master mute in `UserDefaults`.
+- iPhone/iPad use sliders; tvOS uses focusable minus/plus controls because SwiftUI sliders are unavailable on tvOS.
+
+### Replacement contract for final music
+
+Final stems can replace the four `Music*.wav` files without changing gameplay code when they share an identical sample rate, duration, tempo, downbeat, and loop boundary. Final effects can likewise replace their matching `SFX*.wav` files. Before replacement, test the candidate at least ten minutes, confirm gapless looping on physical hardware, archive its source and license, and compare the dance transition with gameplay effects active.

@@ -61,6 +61,9 @@ private struct LevelSelectionView: View {
     @ObservedObject var controller: CampaignController
     let onSelect: (LevelID) -> Void
     @State private var showsResetConfirmation = false
+    @AppStorage(AudioPreferences.mutedKey) private var audioMuted = false
+    @AppStorage(AudioPreferences.musicVolumeKey) private var musicVolume = 0.68
+    @AppStorage(AudioPreferences.effectsVolumeKey) private var effectsVolume = 0.82
 
     var body: some View {
         ZStack {
@@ -91,6 +94,8 @@ private struct LevelSelectionView: View {
                         levelCard(level, number: index + 1)
                     }
 
+                    audioControls
+
                     Button("RESET PROGRESS", role: .destructive) {
                         showsResetConfirmation = true
                     }
@@ -113,6 +118,68 @@ private struct LevelSelectionView: View {
                 controller.resetProgress()
             }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private var audioControls: some View {
+        VStack(spacing: 12) {
+            Toggle("MUTE ALL AUDIO", isOn: $audioMuted)
+                .font(.caption.weight(.bold))
+
+            volumeControl(
+                title: "MUSIC",
+                value: $musicVolume,
+                tint: .purple
+            )
+            .disabled(audioMuted)
+            volumeControl(
+                title: "EFFECTS",
+                value: $effectsVolume,
+                tint: .cyan
+            )
+            .disabled(audioMuted)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.065))
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        )
+        .opacity(audioMuted ? 0.58 : 1)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func volumeControl(
+        title: String,
+        value: Binding<Double>,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.caption2.weight(.heavy))
+                .frame(width: 58, alignment: .leading)
+#if os(tvOS)
+            Button {
+                value.wrappedValue = max(0, value.wrappedValue - 0.1)
+            } label: {
+                Image(systemName: "minus")
+            }
+            ProgressView(value: value.wrappedValue)
+                .tint(tint)
+                .frame(minWidth: 220)
+            Button {
+                value.wrappedValue = min(1, value.wrappedValue + 0.1)
+            } label: {
+                Image(systemName: "plus")
+            }
+#else
+            Slider(value: value, in: 0...1)
+                .tint(tint)
+#endif
+            Text("\(Int(value.wrappedValue * 100))%")
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.white.opacity(0.62))
+                .frame(width: 38, alignment: .trailing)
         }
     }
 

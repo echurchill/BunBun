@@ -49,6 +49,7 @@ final class GameScene: SKScene {
     private let onLevelCompleted: (LevelID, Int) -> Void
     private let onRequestLevels: () -> Void
     private let onRequestNextLevel: () -> Void
+    private let audio = AudioDirector()
 
     private var state: GameState
     private var currentShotIndex = 0
@@ -58,6 +59,7 @@ final class GameScene: SKScene {
     private var showsDebug = false
     private var showsDanceParty = false
     private var didReportCompletion = false
+    private var didPlayEndCue = false
     private var playtestStats = PlaytestRunStats()
 
     private let backgroundLayer = SKNode()
@@ -145,6 +147,12 @@ final class GameScene: SKScene {
         highlightedLane = min(5, state.board.rowCount - 1)
 #endif
         renderAll()
+        audio.startMusic()
+        updateAudioMix()
+    }
+
+    override func willMove(from view: SKView) {
+        audio.stop()
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -256,14 +264,17 @@ final class GameScene: SKScene {
 
         switch result {
         case let .placed(cell):
+            audio.play(.launch)
             end = point(for: cell)
         case .passedThrough:
+            audio.play(.launch)
             let rowY = point(for: Cell(column: 0, row: lane)).y
             end = CGPoint(
                 x: side == .left ? boardOrigin.x + boardWidth + cellWidth : boardOrigin.x - cellWidth,
                 y: rowY
             )
         case .blocked:
+            audio.play(.blocked)
             flashMessage("BLOCKED", color: .systemOrange)
             pulseLaunchTarget(side: side, lane: lane)
             run(.sequence([.wait(forDuration: 0.22), .run(completion)]))
@@ -321,6 +332,7 @@ final class GameScene: SKScene {
         let stage = stages[index]
         updateBunnies(stage.boardBefore)
         let specialKinds = Set(stage.specialActivations.map(\.kind))
+        audio.play(stage.depth == 1 ? .match : .chain, emphasis: stage.depth - 1)
         let message: String
         if specialKinds.count > 1 {
             message = "SPECIAL CHAIN!"
@@ -340,7 +352,10 @@ final class GameScene: SKScene {
         for activation in stage.specialActivations {
             run(.sequence([
                 .wait(forDuration: 0.34),
-                .run { [weak self] in self?.addSpecialEffect(activation) }
+                .run { [weak self] in
+                    self?.audio.play(activation.kind == .redBomb ? .bomb : .line)
+                    self?.addSpecialEffect(activation)
+                }
             ]))
         }
 
@@ -393,6 +408,7 @@ final class GameScene: SKScene {
         }
 
         flashMessage("HOP!", color: .systemPink)
+        audio.play(.hop)
         updateBunnies(outcome.boardAfterResolution)
         for (cell, model) in outcome.boardAfterResolution.occupants {
             guard let bunny = bunnyLayer.childNode(
@@ -411,6 +427,9 @@ final class GameScene: SKScene {
         run(.sequence([
             .wait(forDuration: 0.56),
             .run { [weak self] in
+                if !outcome.fallenBunnies.isEmpty {
+                    self?.audio.play(.rescue)
+                }
                 self?.animateBoardTransition(
                     from: outcome.boardAfterResolution,
                     to: outcome.boardAfterTurn,
@@ -441,6 +460,7 @@ final class GameScene: SKScene {
         updateAimReactions()
 #endif
         drawHUD()
+        updateAudioMix()
         isAnimating = false
         showEndStateIfNeeded()
     }
@@ -1705,6 +1725,7 @@ final class GameScene: SKScene {
 
     private func applyDancePartyTransition(_ outcome: TurnOutcome) {
         if outcome.dancePartyStarted {
+            audio.play(.dance)
             showsDanceParty = true
             configureEnvironmentEffects(danceMode: true)
             configureDancePartyBackdrop()
@@ -1743,6 +1764,11 @@ final class GameScene: SKScene {
 
     private func showEndStateIfNeeded() {
         guard state.status != .playing else { return }
+        if !didPlayEndCue {
+            didPlayEndCue = true
+            audio.play(state.status == .won ? .win : .lose)
+            audio.updateMix(danger: dangerFraction, danceActive: false, fadeDuration: 0.8)
+        }
         playtestStats.finish()
         let panelHeight: CGFloat = state.status == .won ? 250 : 222
         let panel = SKShapeNode(
@@ -1891,11 +1917,21 @@ final class GameScene: SKScene {
         isAnimating = false
         showsDanceParty = false
         didReportCompletion = false
+        didPlayEndCue = false
         playtestStats = PlaytestRunStats()
         partyLayer.removeAllChildren()
         backgroundColor = themeBackgroundColor
         renderAll()
+        updateAudioMix()
         flashMessage("READY!", color: .systemGreen)
+    }
+
+    private var dangerFraction: Float {
+        Float(state.danger) / Float(max(state.rules.dangerLimit, 1))
+    }
+
+    private func updateAudioMix() {
+        audio.updateMix(danger: dangerFraction, danceActive: state.isDancePartyActive)
     }
 
 #if os(tvOS)
@@ -1949,6 +1985,7 @@ final class GameScene: SKScene {
 
     func toggleTelevisionPause() {
         isPaused.toggle()
+        audio.setPaused(isPaused)
     }
 #endif
 
