@@ -1392,7 +1392,13 @@ final class GameScene: SKScene {
         track.lineWidth = 1
         hudLayer.addChild(track)
 
-        let fillWidth = max(0, width * CGFloat(value) / CGFloat(max(maximumValue, 1)))
+        // Game-state meters are bounded, but clamp at the presentation boundary
+        // as well so malformed/debug state can never draw outside its track.
+        let fraction = min(
+            1,
+            max(0, CGFloat(value) / CGFloat(max(maximumValue, 1)))
+        )
+        let fillWidth = width * fraction
         guard fillWidth > 0 else { return }
         let fill = SKShapeNode(rectOf: CGSize(width: fillWidth, height: 5), cornerRadius: 2.5)
         fill.position = CGPoint(x: x - width / 2 + fillWidth / 2, y: y - 2)
@@ -1726,6 +1732,7 @@ final class GameScene: SKScene {
     private func applyDancePartyTransition(_ outcome: TurnOutcome) {
         if outcome.dancePartyStarted {
             audio.play(.dance)
+            audio.updateMix(danger: dangerFraction, danceActive: true, fadeDuration: 0.22)
             showsDanceParty = true
             configureEnvironmentEffects(danceMode: true)
             configureDancePartyBackdrop()
@@ -1733,6 +1740,7 @@ final class GameScene: SKScene {
             flashMessage("DANCE PARTY!  2×", color: .systemYellow)
             addConfetti(for: 3)
         } else if outcome.dancePartyEnded {
+            audio.updateMix(danger: dangerFraction, danceActive: false, fadeDuration: 0.55)
             showsDanceParty = false
             configureEnvironmentEffects(danceMode: false)
             partyLayer.removeAllChildren()

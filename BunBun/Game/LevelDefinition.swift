@@ -3,9 +3,15 @@ import Foundation
 enum LevelID: String, CaseIterable, Codable, Sendable {
     case bunnyLab
     case carrotWorks
+    case sunsetShuffle
+    case meadowWarmup
+    case riversideRomp
+    case campfireCadence
     case moonlightMeadow
     case fireflyFalls
+    case midnightEncore
     case danceRehearsal
+    case snowflakeShuffle
     case birthdayBash
 }
 
@@ -27,6 +33,15 @@ enum LevelEnvironment: String, CaseIterable, Codable, Sendable {
         case .forestCampDay: "BackgroundForestCamp"
         case .forestCampNight: "BackgroundForestCampNight"
         case .snowyWoodland: "BackgroundSnowyWoodland"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .desertCamp: "SUNSET CAMP"
+        case .forestCampDay: "SPRINGTIME CAMP"
+        case .forestCampNight: "MOONLIT CAMP"
+        case .snowyWoodland: "WINTER CAMP"
         }
     }
 }
@@ -107,8 +122,16 @@ struct LevelDefinition: Equatable, Sendable {
         return Dictionary(uniqueKeysWithValues: Board.marchingColumns.compactMap { column in
             let gapValue = column + turn + arrivalSeed
             guard gapValue % arrivalGapModulo != 0 else { return nil }
+
+            // The original game favors tempting almost-matches instead of a
+            // uniformly alternating checkerboard. Shift the two-wide bands
+            // each turn so arrivals usually contain several adjacent pairs,
+            // while moving gaps keep those pairs from becoming automatic
+            // three-bunny matches.
+            let pairPhase = abs(turn + arrivalSeed) % 2
+            let pairBand = (column + pairPhase) / 2
             let colorIndex = abs(
-                column * arrivalColorStride
+                pairBand * arrivalColorStride
                     + turn * arrivalTurnStride
                     + arrivalSeed
             ) % arrivalPalette.count
@@ -132,9 +155,15 @@ enum LevelCatalog {
     static let levels: [LevelDefinition] = [
         bunnyLab,
         carrotWorks,
+        sunsetShuffle,
+        meadowWarmup,
+        riversideRomp,
+        campfireCadence,
         moonlightMeadow,
         fireflyFalls,
+        midnightEncore,
         danceRehearsal,
+        snowflakeShuffle,
         birthdayBash
     ]
 
@@ -191,7 +220,7 @@ enum LevelCatalog {
         environment: .forestCampNight,
         rules: GameRules(
             launchesPerAdvance: 3,
-            progressTarget: 90,
+            progressTarget: 95,
             progressPerMatchedBunny: 3,
             progressPerSpecialEffectBunny: 1,
             progressDecayPerAdvance: 3,
@@ -199,21 +228,13 @@ enum LevelCatalog {
             dangerLimit: 100,
             dangerPerFallenBunny: 8,
             dangerReliefPerClearedBunny: 2,
-            danceTarget: 100,
-            danceChargePerMatchedBunny: 12,
+            danceTarget: 95,
+            danceChargePerMatchedBunny: 15,
             danceChargePerSpecialEffectBunny: 5,
             dancePartyLength: 4,
-            pointsPerRemovedBunny: 110
+            pointsPerRemovedBunny: 130
         ),
-        startingLayout: layout([
-            7: [1: .green, 2: .purple, 3: .orange, 4: .blue, 5: .pink,
-                6: .green, 7: .blue, 8: .purple, 9: .orange, 10: .pink],
-            6: [1: .orange, 2: .blue, 3: .pink, 4: .green, 5: .purple,
-                6: .orange, 7: .pink, 8: .green, 9: .blue, 10: .purple],
-            5: [1: .pink, 3: .green, 4: .purple, 6: .blue,
-                7: .orange, 9: .pink, 10: .green],
-            4: [2: .purple, 4: .orange, 5: .blue, 7: .pink, 8: .green, 10: .orange]
-        ]),
+        startingLayout: nearMatchLayout(colorShift: 1, mirrored: true),
         shotSequence: [
             PrototypeShot(color: .green),
             PrototypeShot(color: .orange),
@@ -258,16 +279,7 @@ enum LevelCatalog {
             dancePartyLength: 4,
             pointsPerRemovedBunny: 105
         ),
-        startingLayout: layout([
-            7: [1: .blue, 2: .green, 3: .orange, 4: .pink, 5: .purple,
-                6: .blue, 7: .green, 8: .orange, 9: .pink, 10: .purple],
-            6: [1: .purple, 2: .blue, 3: .green, 4: .orange, 5: .pink,
-                6: .purple, 7: .blue, 8: .green, 9: .orange, 10: .pink],
-            5: [2: .orange, 3: .pink, 4: .purple, 5: .blue, 6: .green,
-                7: .orange, 8: .pink, 9: .purple, 10: .blue],
-            4: [1: .green, 2: .purple, 3: .blue, 4: .green, 5: .orange,
-                6: .pink, 7: .purple, 8: .blue, 9: .green, 10: .orange]
-        ]),
+        startingLayout: nearMatchLayout(colorShift: 2),
         shotSequence: [
             PrototypeShot(color: .orange),
             PrototypeShot(color: .blue),
@@ -298,7 +310,7 @@ enum LevelCatalog {
         environment: .snowyWoodland,
         rules: GameRules(
             launchesPerAdvance: 2,
-            progressTarget: 80,
+            progressTarget: 85,
             progressPerMatchedBunny: 3,
             progressPerSpecialEffectBunny: 1,
             progressDecayPerAdvance: 2,
@@ -310,18 +322,9 @@ enum LevelCatalog {
             danceChargePerMatchedBunny: 22,
             danceChargePerSpecialEffectBunny: 10,
             dancePartyLength: 5,
-            pointsPerRemovedBunny: 125
+            pointsPerRemovedBunny: 140
         ),
-        startingLayout: layout([
-            7: [1: .pink, 2: .blue, 3: .purple, 4: .orange, 5: .green,
-                6: .pink, 7: .orange, 8: .blue, 9: .green, 10: .purple],
-            6: [1: .blue, 2: .green, 3: .orange, 4: .pink, 5: .purple,
-                6: .blue, 7: .purple, 8: .green, 9: .pink, 10: .orange],
-            5: [1: .purple, 2: .orange, 4: .green, 5: .blue,
-                7: .pink, 8: .purple, 10: .green],
-            4: [2: .pink, 3: .blue, 5: .orange, 6: .purple,
-                8: .green, 9: .blue]
-        ]),
+        startingLayout: nearMatchLayout(colorShift: 3, flipped: true),
         shotSequence: [
             PrototypeShot(color: .pink),
             PrototypeShot(color: .purple, kind: .lineClear),
@@ -350,7 +353,7 @@ enum LevelCatalog {
         environment: .forestCampNight,
         rules: GameRules(
             launchesPerAdvance: 3,
-            progressTarget: 95,
+            progressTarget: 100,
             progressPerMatchedBunny: 3,
             progressPerSpecialEffectBunny: 1,
             progressDecayPerAdvance: 4,
@@ -358,22 +361,13 @@ enum LevelCatalog {
             dangerLimit: 100,
             dangerPerFallenBunny: 9,
             dangerReliefPerClearedBunny: 2,
-            danceTarget: 95,
-            danceChargePerMatchedBunny: 13,
+            danceTarget: 90,
+            danceChargePerMatchedBunny: 16,
             danceChargePerSpecialEffectBunny: 6,
             dancePartyLength: 4,
-            pointsPerRemovedBunny: 115
+            pointsPerRemovedBunny: 135
         ),
-        startingLayout: layout([
-            7: [1: .purple, 2: .pink, 3: .blue, 4: .green, 5: .orange,
-                6: .purple, 7: .pink, 8: .blue, 9: .green, 10: .orange],
-            6: [1: .orange, 2: .purple, 3: .pink, 4: .blue, 5: .green,
-                6: .orange, 7: .purple, 8: .pink, 9: .blue, 10: .green],
-            5: [1: .blue, 2: .green, 4: .purple, 5: .pink,
-                7: .orange, 8: .blue, 10: .purple],
-            4: [2: .pink, 3: .orange, 5: .blue, 6: .purple,
-                8: .green, 9: .pink]
-        ]),
+        startingLayout: nearMatchLayout(colorShift: 4, mirrored: true, flipped: true),
         shotSequence: [
             PrototypeShot(color: .purple),
             PrototypeShot(color: .pink),
@@ -404,7 +398,7 @@ enum LevelCatalog {
         environment: .snowyWoodland,
         rules: GameRules(
             launchesPerAdvance: 2,
-            progressTarget: 75,
+            progressTarget: 95,
             progressPerMatchedBunny: 3,
             progressPerSpecialEffectBunny: 1,
             progressDecayPerAdvance: 3,
@@ -416,18 +410,9 @@ enum LevelCatalog {
             danceChargePerMatchedBunny: 24,
             danceChargePerSpecialEffectBunny: 12,
             dancePartyLength: 5,
-            pointsPerRemovedBunny: 140
+            pointsPerRemovedBunny: 150
         ),
-        startingLayout: layout([
-            7: [1: .pink, 2: .purple, 3: .blue, 4: .orange, 5: .green,
-                6: .pink, 7: .purple, 8: .blue, 9: .orange, 10: .green],
-            6: [1: .green, 2: .pink, 3: .purple, 4: .blue, 5: .orange,
-                6: .green, 7: .pink, 8: .purple, 9: .blue, 10: .orange],
-            5: [1: .blue, 2: .orange, 3: .green, 5: .purple,
-                6: .pink, 7: .blue, 9: .orange, 10: .green],
-            4: [2: .purple, 3: .pink, 4: .blue, 6: .orange,
-                7: .green, 8: .purple, 10: .pink]
-        ]),
+        startingLayout: nearMatchLayout(colorShift: 0, mirrored: true),
         shotSequence: [
             PrototypeShot(color: .pink),
             PrototypeShot(color: .red, kind: .redBomb),
@@ -450,6 +435,271 @@ enum LevelCatalog {
         tutorialPrompts: []
     )
 
+    static let sunsetShuffle = LevelDefinition(
+        id: .sunsetShuffle,
+        displayName: "Sunset Shuffle",
+        subtitle: "Finish camp with longer combinations",
+        theme: .lab,
+        environment: .desertCamp,
+        rules: GameRules(
+            launchesPerAdvance: 3,
+            progressTarget: 110,
+            progressPerMatchedBunny: 3,
+            progressPerSpecialEffectBunny: 1,
+            progressDecayPerAdvance: 3,
+            progressLostPerFallenBunny: 2,
+            dangerLimit: 100,
+            dangerPerFallenBunny: 7,
+            dangerReliefPerClearedBunny: 3,
+            danceTarget: 95,
+            danceChargePerMatchedBunny: 14,
+            danceChargePerSpecialEffectBunny: 6,
+            dancePartyLength: 4,
+            pointsPerRemovedBunny: 110
+        ),
+        startingLayout: nearMatchLayout(colorShift: 4, mirrored: true),
+        shotSequence: [
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .pink)
+        ],
+        arrivalPalette: [.green, .orange, .blue, .pink, .purple],
+        arrivalSeed: 6,
+        arrivalGapModulo: 6,
+        arrivalColorStride: 3,
+        arrivalTurnStride: 2,
+        tutorialPrompts: []
+    )
+
+    static let meadowWarmup = LevelDefinition(
+        id: .meadowWarmup,
+        displayName: "Meadow Warmup",
+        subtitle: "Meet the springtime crowd",
+        theme: .meadow,
+        environment: .forestCampDay,
+        rules: GameRules(
+            launchesPerAdvance: 3,
+            progressTarget: 95,
+            progressPerMatchedBunny: 3,
+            progressPerSpecialEffectBunny: 1,
+            progressDecayPerAdvance: 2,
+            progressLostPerFallenBunny: 2,
+            dangerLimit: 100,
+            dangerPerFallenBunny: 7,
+            dangerReliefPerClearedBunny: 3,
+            danceTarget: 100,
+            danceChargePerMatchedBunny: 14,
+            danceChargePerSpecialEffectBunny: 5,
+            dancePartyLength: 4,
+            pointsPerRemovedBunny: 115
+        ),
+        startingLayout: nearMatchLayout(colorShift: 1, flipped: true),
+        shotSequence: [
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .purple, kind: .lineClear)
+        ],
+        arrivalPalette: [.pink, .green, .blue, .orange, .purple],
+        arrivalSeed: 7,
+        arrivalGapModulo: 6,
+        arrivalColorStride: 2,
+        arrivalTurnStride: 1,
+        tutorialPrompts: []
+    )
+
+    static let riversideRomp = LevelDefinition(
+        id: .riversideRomp,
+        displayName: "Riverside Romp",
+        subtitle: "Turn pairs into tumbling chains",
+        theme: .meadow,
+        environment: .forestCampDay,
+        rules: GameRules(
+            launchesPerAdvance: 3,
+            progressTarget: 100,
+            progressPerMatchedBunny: 3,
+            progressPerSpecialEffectBunny: 1,
+            progressDecayPerAdvance: 3,
+            progressLostPerFallenBunny: 3,
+            dangerLimit: 100,
+            dangerPerFallenBunny: 8,
+            dangerReliefPerClearedBunny: 3,
+            danceTarget: 95,
+            danceChargePerMatchedBunny: 15,
+            danceChargePerSpecialEffectBunny: 6,
+            dancePartyLength: 4,
+            pointsPerRemovedBunny: 120
+        ),
+        startingLayout: nearMatchLayout(colorShift: 2, mirrored: true, flipped: true),
+        shotSequence: [
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .purple),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .purple, kind: .lineClear)
+        ],
+        arrivalPalette: [.blue, .orange, .pink, .green, .purple],
+        arrivalSeed: 8,
+        arrivalGapModulo: 7,
+        arrivalColorStride: 3,
+        arrivalTurnStride: 2,
+        tutorialPrompts: []
+    )
+
+    static let campfireCadence = LevelDefinition(
+        id: .campfireCadence,
+        displayName: "Campfire Cadence",
+        subtitle: "Keep the daytime finale moving",
+        theme: .meadow,
+        environment: .forestCampDay,
+        rules: GameRules(
+            launchesPerAdvance: 3,
+            progressTarget: 105,
+            progressPerMatchedBunny: 3,
+            progressPerSpecialEffectBunny: 1,
+            progressDecayPerAdvance: 4,
+            progressLostPerFallenBunny: 3,
+            dangerLimit: 100,
+            dangerPerFallenBunny: 8,
+            dangerReliefPerClearedBunny: 2,
+            danceTarget: 90,
+            danceChargePerMatchedBunny: 16,
+            danceChargePerSpecialEffectBunny: 7,
+            dancePartyLength: 4,
+            pointsPerRemovedBunny: 125
+        ),
+        startingLayout: nearMatchLayout(colorShift: 3, mirrored: true),
+        shotSequence: [
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .green)
+        ],
+        arrivalPalette: [.orange, .pink, .green, .blue, .purple],
+        arrivalSeed: 9,
+        arrivalGapModulo: 7,
+        arrivalColorStride: 2,
+        arrivalTurnStride: 3,
+        tutorialPrompts: []
+    )
+
+    static let midnightEncore = LevelDefinition(
+        id: .midnightEncore,
+        displayName: "Midnight Encore",
+        subtitle: "Hold the moonlit stage together",
+        theme: .meadow,
+        environment: .forestCampNight,
+        rules: GameRules(
+            launchesPerAdvance: 3,
+            progressTarget: 105,
+            progressPerMatchedBunny: 3,
+            progressPerSpecialEffectBunny: 1,
+            progressDecayPerAdvance: 5,
+            progressLostPerFallenBunny: 3,
+            dangerLimit: 100,
+            dangerPerFallenBunny: 9,
+            dangerReliefPerClearedBunny: 2,
+            danceTarget: 85,
+            danceChargePerMatchedBunny: 17,
+            danceChargePerSpecialEffectBunny: 8,
+            dancePartyLength: 4,
+            pointsPerRemovedBunny: 135
+        ),
+        startingLayout: nearMatchLayout(colorShift: 0, flipped: true),
+        shotSequence: [
+            PrototypeShot(color: .purple),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .pink)
+        ],
+        arrivalPalette: [.purple, .blue, .pink, .green, .orange],
+        arrivalSeed: 10,
+        arrivalGapModulo: 8,
+        arrivalColorStride: 3,
+        arrivalTurnStride: 4,
+        tutorialPrompts: []
+    )
+
+    static let snowflakeShuffle = LevelDefinition(
+        id: .snowflakeShuffle,
+        displayName: "Snowflake Shuffle",
+        subtitle: "Dance between faster advances",
+        theme: .rehearsal,
+        environment: .snowyWoodland,
+        rules: GameRules(
+            launchesPerAdvance: 2,
+            progressTarget: 90,
+            progressPerMatchedBunny: 3,
+            progressPerSpecialEffectBunny: 1,
+            progressDecayPerAdvance: 3,
+            progressLostPerFallenBunny: 3,
+            dangerLimit: 100,
+            dangerPerFallenBunny: 9,
+            dangerReliefPerClearedBunny: 3,
+            danceTarget: 75,
+            danceChargePerMatchedBunny: 23,
+            danceChargePerSpecialEffectBunny: 11,
+            dancePartyLength: 5,
+            pointsPerRemovedBunny: 145
+        ),
+        startingLayout: nearMatchLayout(colorShift: 4),
+        shotSequence: [
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .purple, kind: .lineClear)
+        ],
+        arrivalPalette: [.blue, .purple, .pink, .green, .orange],
+        arrivalSeed: 11,
+        arrivalGapModulo: 8,
+        arrivalColorStride: 2,
+        arrivalTurnStride: 4,
+        tutorialPrompts: []
+    )
+
     static func definition(for id: LevelID) -> LevelDefinition {
         levels.first { $0.id == id } ?? bunnyLab
     }
@@ -468,5 +718,38 @@ enum LevelCatalog {
             }
         }
         return result
+    }
+
+    /// Curated match-free formation with several adjacent pairs and open
+    /// approach lanes. Color shifts and reflections provide repeatable stage
+    /// variants without losing the carefully checked near-match topology.
+    private static func nearMatchLayout(
+        colorShift: Int,
+        mirrored: Bool = false,
+        flipped: Bool = false
+    ) -> [Cell: PrototypeShot] {
+        let base = layout([
+            7: [1: .blue, 2: .blue, 3: .green, 4: .orange, 5: .orange,
+                6: .pink, 7: .purple, 8: .purple, 9: .green, 10: .pink],
+            6: [1: .orange, 2: .pink, 3: .pink, 4: .purple, 5: .green,
+                6: .green, 7: .blue, 8: .orange, 9: .orange, 10: .purple],
+            5: [1: .purple, 2: .purple, 4: .blue, 5: .blue,
+                7: .pink, 8: .pink, 10: .green],
+            4: [2: .orange, 3: .orange, 6: .purple, 7: .purple,
+                9: .blue, 10: .blue]
+        ])
+        let palette: [BunnyColor] = [.blue, .green, .orange, .pink, .purple]
+
+        return Dictionary(uniqueKeysWithValues: base.map { cell, shot in
+            let column = mirrored ? 11 - cell.column : cell.column
+            let row = flipped ? 11 - cell.row : cell.row
+            let color: BunnyColor
+            if let index = palette.firstIndex(of: shot.color) {
+                color = palette[(index + colorShift) % palette.count]
+            } else {
+                color = shot.color
+            }
+            return (Cell(column: column, row: row), PrototypeShot(color: color, kind: shot.kind))
+        })
     }
 }

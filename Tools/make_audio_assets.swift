@@ -266,21 +266,48 @@ private func makePressure() -> Sound {
 
 private func makeDance() -> Sound {
     var sound = Sound(duration: musicDuration)
-    let counter = [72, 74, 76, 79, 76, 74, 72, 67]
+    let roots = [48, 45, 41, 43] // C, A, F, G -- synchronized with the base loop.
+    let chords = [[72, 76, 79], [69, 72, 76], [65, 69, 72], [67, 71, 74]]
+    let counter = [72, 76, 79, 84, 79, 76, 74, 79]
     for bar in 0..<16 {
         let barStart = Double(bar) * barDuration
-        addClap(to: &sound, at: barStart + beatDuration, seed: UInt64(5000 + bar), gain: 0.18)
-        addClap(to: &sound, at: barStart + beatDuration * 3, seed: UInt64(6000 + bar), gain: 0.18)
-        for eighth in 0..<8 {
-            let time = barStart + Double(eighth) * beatDuration / 2
-            if eighth % 2 == 1 {
-                sound.tone(start: time, duration: beatDuration * 0.20, frequency: frequency(counter[(eighth + bar * 2) % counter.count] + 12), gain: 0.13, waveform: .triangle, attack: 0.02, releasePower: 3.2)
+
+        // A clear four-on-the-floor pulse makes the party audible immediately,
+        // no matter which beat happens to be playing when the layer fades in.
+        for beat in 0..<4 {
+            let time = barStart + Double(beat) * beatDuration
+            addKick(to: &sound, at: time, gain: beat == 0 ? 0.72 : 0.60)
+            if beat == 1 || beat == 3 {
+                addClap(to: &sound, at: time, seed: UInt64(5000 + bar * 10 + beat), gain: 0.27)
             }
         }
+
+        let root = roots[bar % roots.count]
+        for eighth in 0..<8 {
+            let time = barStart + Double(eighth) * beatDuration / 2
+            addHat(
+                to: &sound,
+                at: time,
+                seed: UInt64(6500 + bar * 20 + eighth),
+                gain: eighth.isMultiple(of: 2) ? 0.10 : 0.18
+            )
+
+            // Bouncy octave bass and a bright answer phrase distinguish this
+            // from the calmer base groove without changing tempo or harmony.
+            let bassNote = root + (eighth.isMultiple(of: 2) ? 12 : 0)
+            sound.tone(start: time, duration: beatDuration * 0.33, frequency: frequency(bassNote), gain: 0.24, waveform: .softSquare, attack: 0.015, releasePower: 1.8)
+            if eighth % 2 == 1 {
+                sound.tone(start: time, duration: beatDuration * 0.25, frequency: frequency(counter[(eighth + bar * 2) % counter.count] + 12), gain: 0.19, waveform: .triangle, attack: 0.015, releasePower: 3.0)
+            }
+        }
+
+        addChord(to: &sound, at: barStart + beatDuration * 0.48, notes: chords[bar % chords.count], duration: beatDuration * 0.30, gain: 0.40)
+        addChord(to: &sound, at: barStart + beatDuration * 2.48, notes: chords[bar % chords.count], duration: beatDuration * 0.30, gain: 0.38)
+
         if bar % 4 == 3 {
             for step in 0..<4 {
                 // Keep the final hit inside the bar so the repeated stem has a clean boundary.
-                addSnare(to: &sound, at: barStart + beatDuration * (3 + Double(step) / 5), seed: UInt64(7000 + bar * 10 + step), gain: 0.16 + Double(step) * 0.025)
+                addSnare(to: &sound, at: barStart + beatDuration * (3 + Double(step) / 5), seed: UInt64(7000 + bar * 10 + step), gain: 0.20 + Double(step) * 0.03)
             }
         }
     }
@@ -353,13 +380,15 @@ private func makeRescue() -> Sound {
 }
 
 private func makeDanceStinger() -> Sound {
-    var sound = Sound(duration: 1.2)
-    for (index, note) in [60, 64, 67, 72].enumerated() {
-        let start = Double(index) * 0.10
-        sound.tone(start: start, duration: 0.55, frequency: frequency(note), gain: 0.24, waveform: .softSquare, releasePower: 2.3)
+    var sound = Sound(duration: 1.35)
+    for (index, note) in [60, 64, 67, 72, 76].enumerated() {
+        let start = Double(index) * 0.085
+        sound.tone(start: start, duration: 0.62, frequency: frequency(note), gain: 0.28, waveform: .softSquare, releasePower: 2.3)
     }
-    addClap(to: &sound, at: 0.43, seed: 8_080, gain: 0.24)
-    addClap(to: &sound, at: 0.70, seed: 8_081, gain: 0.20)
+    addKick(to: &sound, at: 0, gain: 0.70)
+    addClap(to: &sound, at: 0.43, seed: 8_080, gain: 0.32)
+    addClap(to: &sound, at: 0.70, seed: 8_081, gain: 0.27)
+    sound.glide(start: 0.38, duration: 0.75, from: 520, to: 1_560, gain: 0.16, waveform: .triangle)
     return sound
 }
 
@@ -456,10 +485,25 @@ private func generateAssets() throws {
         print("Wrote \(name)")
     }
 
-    // A convenient full-mix reference for listening outside the game.
-    var preview = base.mixed(with: melody, gain: 0.78)
-    preview = preview.mixed(with: pressure, gain: 0.35)
-    preview = preview.mixed(with: dance, gain: 0.70)
+    // A convenient A/B reference for listening outside the game: eight bars
+    // of the regular mix followed by eight bars of the dance-party mix.
+    var preview = Sound(duration: musicDuration)
+    let transitionSample = preview.samples.count / 2
+    for index in preview.samples.indices {
+        if index < transitionSample {
+            preview.samples[index] = base.samples[index] * 0.50
+                + melody.samples[index] * 0.34
+                + pressure.samples[index] * 0.15
+        } else {
+            preview.samples[index] = base.samples[index] * 0.38
+                + melody.samples[index] * 0.12
+                + dance.samples[index] * 0.82
+        }
+    }
+    let danceStinger = makeDanceStinger()
+    for index in danceStinger.samples.indices where transitionSample + index < preview.samples.count {
+        preview.samples[transitionSample + index] += danceStinger.samples[index] * 0.70
+    }
     try writeWAV(preview, to: outputDirectory.appendingPathComponent("BunBunThemePreview.wav"))
     print("Wrote BunBunThemePreview.wav")
 }

@@ -42,6 +42,7 @@
 		A10000000000000000000024 /* CreekWaterRendered.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* CreekWaterRendered.png */; };
 		A10000000000000000000025 /* AudioDirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002A /* AudioDirector.swift */; };
 		A10000000000000000000026 /* Audio in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002B /* Audio */; };
+		A10000000000000000000027 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002C /* Assets.xcassets */; };
 		A20000000000000000000001 /* BunBunApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* BunBunApp.swift */; };
 		A20000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* ContentView.swift */; };
 		A20000000000000000000003 /* Bunny.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* Bunny.swift */; };
@@ -72,6 +73,7 @@
 		A2000000000000000000001C /* CreekWaterRendered.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* CreekWaterRendered.png */; };
 		A2000000000000000000001D /* AudioDirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002A /* AudioDirector.swift */; };
 		A2000000000000000000001E /* Audio in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002B /* Audio */; };
+		A2000000000000000000001F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000002C /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -128,6 +130,7 @@
 		B10000000000000000000029 /* BunBun TV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "BunBun TV.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000000000000000000002A /* AudioDirector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDirector.swift; sourceTree = "<group>"; };
 		B1000000000000000000002B /* Audio */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Audio; sourceTree = "<group>"; };
+		B1000000000000000000002C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -237,6 +240,7 @@
 		D20000000000000000000008 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				B1000000000000000000002C /* Assets.xcassets */,
 				B1000000000000000000002B /* Audio */,
 				B10000000000000000000013 /* BunnyIdleSheet.png */,
 				B10000000000000000000014 /* BunnyCelebrateSheet.png */,
@@ -362,6 +366,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000027 /* Assets.xcassets in Resources */,
 				A10000000000000000000026 /* Audio in Resources */,
 				A1000000000000000000000F /* BunnyIdleSheet.png in Resources */,
 				A10000000000000000000010 /* BunnyCelebrateSheet.png in Resources */,
@@ -392,6 +397,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2000000000000000000001F /* Assets.xcassets in Resources */,
 				A2000000000000000000001E /* Audio in Resources */,
 				A2000000000000000000000E /* BunnyIdleSheet.png in Resources */,
 				A2000000000000000000000F /* BunnyCelebrateSheet.png in Resources */,
@@ -599,6 +605,7 @@
 		C30000000000000000000007 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = DXK68VKUGB;
@@ -623,6 +630,7 @@
 		C30000000000000000000008 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = DXK68VKUGB;

@@ -59,6 +59,35 @@ final class GamePressureTests: XCTestCase {
         XCTAssertEqual(state.dancePartyTurnsRemaining, 3)
     }
 
+    func testLargeComboWrapsDanceChargeWithoutOverflowingMeter() {
+        let rules = GameRules(
+            launchesPerAdvance: 3,
+            progressTarget: 100,
+            progressPerMatchedBunny: 3,
+            progressPerSpecialEffectBunny: 1,
+            progressDecayPerAdvance: 2,
+            progressLostPerFallenBunny: 2,
+            dangerLimit: 100,
+            dangerPerFallenBunny: 6,
+            dangerReliefPerClearedBunny: 3,
+            danceTarget: 20,
+            danceChargePerMatchedBunny: 25,
+            danceChargePerSpecialEffectBunny: 4,
+            dancePartyLength: 4,
+            pointsPerRemovedBunny: 100
+        )
+        var board = Board()
+        XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: 2, row: 1)))
+        XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: 3, row: 1)))
+        var state = GameState(board: board, rules: rules, danceMeter: 10)
+
+        let outcome = state.launch(Bunny(color: .blue), from: .left, lane: 1)
+
+        XCTAssertTrue(outcome.dancePartyStarted)
+        XCTAssertEqual(state.danceMeter, 5)
+        XCTAssertLessThan(state.danceMeter, rules.danceTarget)
+    }
+
     func testOneFallenBunnyAddsDangerButDoesNotEndGame() {
         var board = Board()
         XCTAssertTrue(board.place(Bunny(color: .purple), at: Cell(column: 4, row: 0)))

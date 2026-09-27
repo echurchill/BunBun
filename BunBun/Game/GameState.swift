@@ -142,7 +142,10 @@ struct GameState: Equatable, Sendable {
             } else {
                 danceMeter += danceCharge
                 if danceMeter >= rules.danceTarget {
-                    danceMeter -= rules.danceTarget
+                    // A large chain can earn several meters of charge at once.
+                    // Keep only the remainder so the next-party meter always
+                    // stays inside its documented 0..<danceTarget range.
+                    danceMeter %= rules.danceTarget
                     dancePartyTurnsRemaining = rules.dancePartyLength
                     dancePartyStarted = true
                 }

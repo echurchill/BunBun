@@ -25,7 +25,7 @@ enum AudioPreferences {
     }
 }
 
-enum AudioCue: CaseIterable, Hashable {
+enum AudioCue: CaseIterable, Hashable, Sendable {
     case launch
     case blocked
     case match
@@ -73,8 +73,8 @@ enum AudioCue: CaseIterable, Hashable {
 
 /// Presentation-only adaptive audio. The four loop files share the same length,
 /// tempo, and start time, so changing their volumes never restarts the groove.
-final class AudioDirector {
-    private enum MusicLayer: String, CaseIterable {
+final class AudioDirector: @unchecked Sendable {
+    private enum MusicLayer: String, CaseIterable, Sendable {
         case base = "MusicBase"
         case melody = "MusicMelody"
         case pressure = "MusicPressure"
@@ -86,16 +86,66 @@ final class AudioDirector {
     private var hasStartedMusic = false
     private var dangerFraction: Float = 0
     private var danceIsActive = false
+    private let audioQueue = DispatchQueue(label: "com.eddie.BunBun.audio", qos: .userInitiated)
+    private let audioQueueKey = DispatchSpecificKey<Void>()
 
     init() {
-        configureAudioSession()
+        audioQueue.setSpecific(key: audioQueueKey, value: ())
+        audioQueue.async { [weak self] in
+            self?.configureAudioSession()
+        }
     }
 
     deinit {
-        stop()
+        if DispatchQueue.getSpecific(key: audioQueueKey) != nil {
+            stopOnAudioQueue()
+        } else {
+            audioQueue.sync {
+                stopOnAudioQueue()
+            }
+        }
     }
 
     func startMusic() {
+        audioQueue.async { [weak self] in
+            self?.startMusicOnAudioQueue()
+        }
+    }
+
+    func stop() {
+        audioQueue.async { [weak self] in
+            self?.stopOnAudioQueue()
+        }
+    }
+
+    func setPaused(_ paused: Bool) {
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            if paused {
+                for player in musicPlayers.values { player.pause() }
+            } else {
+                for player in musicPlayers.values where !player.isPlaying { player.play() }
+            }
+        }
+    }
+
+    func updateMix(danger: Float, danceActive: Bool, fadeDuration: TimeInterval = 0.45) {
+        audioQueue.async { [weak self] in
+            self?.updateMixOnAudioQueue(
+                danger: danger,
+                danceActive: danceActive,
+                fadeDuration: fadeDuration
+            )
+        }
+    }
+
+    func play(_ cue: AudioCue, emphasis: Int = 0) {
+        audioQueue.async { [weak self] in
+            self?.playOnAudioQueue(cue, emphasis: emphasis)
+        }
+    }
+
+    private func startMusicOnAudioQueue() {
         preloadEffects()
         guard !hasStartedMusic, !AudioPreferences.isMuted, AudioPreferences.musicVolume > 0 else { return }
 
@@ -115,10 +165,10 @@ final class AudioDirector {
         for player in loaded.values {
             player.play(atTime: synchronizedStart)
         }
-        updateMix(danger: dangerFraction, danceActive: danceIsActive, fadeDuration: 0.65)
+        updateMixOnAudioQueue(danger: dangerFraction, danceActive: danceIsActive, fadeDuration: 0.65)
     }
 
-    func stop() {
+    private func stopOnAudioQueue() {
         for player in musicPlayers.values { player.stop() }
         for player in effectPlayers.values { player.stop() }
         musicPlayers.removeAll()
@@ -126,31 +176,30 @@ final class AudioDirector {
         hasStartedMusic = false
     }
 
-    func setPaused(_ paused: Bool) {
-        if paused {
-            for player in musicPlayers.values { player.pause() }
-        } else {
-            for player in musicPlayers.values where !player.isPlaying { player.play() }
-        }
-    }
-
-    func updateMix(danger: Float, danceActive: Bool, fadeDuration: TimeInterval = 0.45) {
+    private func updateMixOnAudioQueue(
+        danger: Float,
+        danceActive: Bool,
+        fadeDuration: TimeInterval
+    ) {
         dangerFraction = min(1, max(0, danger))
         danceIsActive = danceActive
         guard hasStartedMusic else {
-            startMusic()
+            startMusicOnAudioQueue()
             return
         }
 
         let master = AudioPreferences.isMuted ? 0 : AudioPreferences.musicVolume
         let pressureCurve = pow(dangerFraction, 1.35)
-        setVolume(0.50 * master, for: .base, duration: fadeDuration)
-        setVolume((danceActive ? 0.27 : 0.34) * master, for: .melody, duration: fadeDuration)
-        setVolume((0.025 + pressureCurve * 0.34) * master, for: .pressure, duration: fadeDuration)
-        setVolume((danceActive ? 0.48 : 0) * master, for: .dance, duration: fadeDuration)
+        // A dance party should sound like a new section, not one more quiet
+        // ornament on top of the normal arrangement. Duck the familiar hook
+        // and remove the danger pulse so the brighter dance stem owns the mix.
+        setVolume((danceActive ? 0.38 : 0.50) * master, for: .base, duration: fadeDuration)
+        setVolume((danceActive ? 0.12 : 0.34) * master, for: .melody, duration: fadeDuration)
+        setVolume((danceActive ? 0 : 0.025 + pressureCurve * 0.34) * master, for: .pressure, duration: fadeDuration)
+        setVolume((danceActive ? 0.82 : 0) * master, for: .dance, duration: fadeDuration)
     }
 
-    func play(_ cue: AudioCue, emphasis: Int = 0) {
+    private func playOnAudioQueue(_ cue: AudioCue, emphasis: Int) {
         guard !AudioPreferences.isMuted, AudioPreferences.effectsVolume > 0 else { return }
         let player: AVAudioPlayer
         if let preloaded = effectPlayers[cue] {

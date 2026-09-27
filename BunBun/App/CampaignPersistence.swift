@@ -33,9 +33,10 @@ struct CampaignRepository {
 
     func load() -> CampaignState {
         guard let data = persistence.campaignData,
-              let campaign = try? JSONDecoder().decode(CampaignState.self, from: data) else {
+              var campaign = try? JSONDecoder().decode(CampaignState.self, from: data) else {
             return CampaignState()
         }
+        campaign.reconcileUnlocks()
         return campaign
     }
 

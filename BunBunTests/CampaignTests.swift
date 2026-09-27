@@ -19,6 +19,25 @@ final class LevelDefinitionTests: XCTestCase {
         }
     }
 
+    func testStartingBoardsOfferSeveralNearMatchPairs() {
+        for level in LevelCatalog.levels {
+            let board = level.startingBoard()
+            let pairEdges = board.occupiedCells.reduce(into: 0) { count, cell in
+                guard let bunny = board[cell] else { return }
+                let right = cell.neighbor(columnDelta: 1, rowDelta: 0)
+                let above = cell.neighbor(columnDelta: 0, rowDelta: 1)
+                if board[right]?.color == bunny.color { count += 1 }
+                if board[above]?.color == bunny.color { count += 1 }
+            }
+
+            XCTAssertGreaterThanOrEqual(
+                pairEdges,
+                3,
+                "\(level.displayName) should begin with useful almost-matches"
+            )
+        }
+    }
+
     func testLevelRulesReachGameState() {
         for level in LevelCatalog.levels {
             let state = GameState(board: level.startingBoard(), rules: level.rules)
@@ -38,11 +57,38 @@ final class LevelDefinitionTests: XCTestCase {
         }
     }
 
+    func testSeededArrivalsFavorAdjacentPairsWithoutFreeTriples() {
+        for level in LevelCatalog.levels {
+            var adjacentPairs = 0
+            for turn in 0..<12 {
+                let pattern = level.arrivalPattern(forTurn: turn)
+                for column in Board.marchingColumns.dropLast() {
+                    guard let color = pattern[column]?.color else { continue }
+                    if pattern[column + 1]?.color == color {
+                        adjacentPairs += 1
+                    }
+                    XCTAssertFalse(
+                        pattern[column + 1]?.color == color
+                            && pattern[column + 2]?.color == color,
+                        "\(level.displayName) should seed pairs, not automatic triples"
+                    )
+                }
+            }
+
+            XCTAssertGreaterThanOrEqual(
+                adjacentPairs,
+                24,
+                "\(level.displayName) should regularly generate tempting pairs"
+            )
+        }
+    }
+
     func testLevelsHaveMeaningfullyDifferentRulesAndSequences() {
         XCTAssertNotEqual(LevelCatalog.bunnyLab.rules, LevelCatalog.moonlightMeadow.rules)
         XCTAssertNotEqual(LevelCatalog.moonlightMeadow.rules, LevelCatalog.danceRehearsal.rules)
         XCTAssertNotEqual(LevelCatalog.bunnyLab.shotSequence, LevelCatalog.danceRehearsal.shotSequence)
-        XCTAssertEqual(LevelCatalog.levels.count, 6)
+        XCTAssertEqual(LevelCatalog.levels.count, 12)
+        XCTAssertEqual(LevelCatalog.levels.map(\.id), LevelID.allCases)
         XCTAssertEqual(LevelCatalog.bunnyLab.theme, LevelCatalog.carrotWorks.theme)
         XCTAssertEqual(LevelCatalog.moonlightMeadow.theme, LevelCatalog.fireflyFalls.theme)
         XCTAssertEqual(LevelCatalog.danceRehearsal.theme, LevelCatalog.birthdayBash.theme)
@@ -64,10 +110,24 @@ final class LevelDefinitionTests: XCTestCase {
     func testEnvironmentProfilesStayIndependentFromRulesThemes() {
         XCTAssertEqual(LevelCatalog.bunnyLab.environment, .desertCamp)
         XCTAssertEqual(LevelCatalog.carrotWorks.environment, .desertCamp)
+        XCTAssertEqual(LevelCatalog.sunsetShuffle.environment, .desertCamp)
+        XCTAssertEqual(LevelCatalog.meadowWarmup.environment, .forestCampDay)
+        XCTAssertEqual(LevelCatalog.riversideRomp.environment, .forestCampDay)
+        XCTAssertEqual(LevelCatalog.campfireCadence.environment, .forestCampDay)
         XCTAssertEqual(LevelCatalog.moonlightMeadow.environment, .forestCampNight)
         XCTAssertEqual(LevelCatalog.fireflyFalls.environment, .forestCampNight)
+        XCTAssertEqual(LevelCatalog.midnightEncore.environment, .forestCampNight)
         XCTAssertEqual(LevelCatalog.danceRehearsal.environment, .snowyWoodland)
+        XCTAssertEqual(LevelCatalog.snowflakeShuffle.environment, .snowyWoodland)
         XCTAssertEqual(LevelCatalog.birthdayBash.environment, .snowyWoodland)
+
+        for environment in LevelEnvironment.allCases {
+            XCTAssertEqual(
+                LevelCatalog.levels.filter { $0.environment == environment }.count,
+                3,
+                "\(environment.displayName) should contain a three-stage arc"
+            )
+        }
     }
 }
 
@@ -123,6 +183,25 @@ final class CampaignStateTests: XCTestCase {
         let decoded = try JSONDecoder().decode(CampaignState.self, from: data)
 
         XCTAssertEqual(decoded, original)
+    }
+
+    func testLoadingAnOlderFrontierUnlocksInsertedStagesWithoutLosingProgress() throws {
+        let oldCampaign = CampaignState(
+            unlockedLevels: [.bunnyLab, .carrotWorks, .moonlightMeadow],
+            completedLevels: [.bunnyLab, .carrotWorks],
+            bestScores: [.bunnyLab: 900, .carrotWorks: 1_100]
+        )
+        let storage = MemoryCampaignPersistence(
+            campaignData: try JSONEncoder().encode(oldCampaign)
+        )
+
+        let migrated = CampaignRepository(persistence: storage).load()
+
+        XCTAssertTrue(migrated.isUnlocked(.sunsetShuffle))
+        XCTAssertTrue(migrated.isUnlocked(.meadowWarmup))
+        XCTAssertTrue(migrated.isUnlocked(.campfireCadence))
+        XCTAssertTrue(migrated.isUnlocked(.moonlightMeadow))
+        XCTAssertEqual(migrated.bestScore(for: .carrotWorks), 1_100)
     }
 
     func testMissingAndCorruptSaveDataFallBackSafely() {

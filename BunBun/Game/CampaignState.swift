@@ -27,6 +27,24 @@ struct CampaignState: Equatable, Codable, Sendable {
         bestScores[levelID]
     }
 
+    /// Keeps prototype saves usable when new stages are inserted before the
+    /// player's previous frontier. Progress is never removed; newly inserted
+    /// stages up to that frontier become available alongside the old ones.
+    mutating func reconcileUnlocks(orderedLevels: [LevelID] = LevelID.allCases) {
+        guard !orderedLevels.isEmpty else { return }
+        unlockedLevels.insert(orderedLevels[0])
+
+        let knownProgress = unlockedLevels.union(completedLevels)
+        let furthestIndex = knownProgress.compactMap { orderedLevels.firstIndex(of: $0) }.max() ?? 0
+        unlockedLevels.formUnion(orderedLevels.prefix(furthestIndex + 1))
+
+        for completed in completedLevels {
+            guard let index = orderedLevels.firstIndex(of: completed),
+                  orderedLevels.indices.contains(index + 1) else { continue }
+            unlockedLevels.insert(orderedLevels[index + 1])
+        }
+    }
+
     mutating func record(
         levelID: LevelID,
         score: Int,

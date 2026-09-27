@@ -91,6 +91,9 @@ private struct LevelSelectionView: View {
                     .padding(.bottom, 5)
 
                     ForEach(Array(LevelCatalog.levels.enumerated()), id: \.element.id) { index, level in
+                        if index == 0 || LevelCatalog.levels[index - 1].environment != level.environment {
+                            worldHeader(level.environment)
+                        }
                         levelCard(level, number: index + 1)
                     }
 
@@ -147,6 +150,20 @@ private struct LevelSelectionView: View {
         )
         .opacity(audioMuted ? 0.58 : 1)
         .accessibilityElement(children: .contain)
+    }
+
+    private func worldHeader(_ environment: LevelEnvironment) -> some View {
+        HStack(spacing: 12) {
+            Text(environment.displayName)
+                .font(.caption.weight(.black))
+                .tracking(1.4)
+                .foregroundStyle(.white.opacity(0.72))
+            Rectangle()
+                .fill(Color.white.opacity(0.16))
+                .frame(height: 1)
+        }
+        .padding(.top, 9)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func volumeControl(
