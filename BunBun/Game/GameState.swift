@@ -6,6 +6,11 @@ enum PlayStatus: Equatable, Sendable {
     case lost
 }
 
+enum GameMode: Equatable, Sendable {
+    case classic
+    case endless
+}
+
 struct TurnOutcome: Equatable, Sendable {
     let launchResult: LaunchResult
     let chain: ChainResolution?
@@ -37,8 +42,10 @@ struct GameState: Equatable, Sendable {
     static let dancePartyLength = GameRules.bunnyLab.dancePartyLength
 
     let rules: GameRules
+    let mode: GameMode
     private(set) var board: Board
     private(set) var launchesSinceAdvance: Int
+    private(set) var totalLaunches: Int
     private(set) var score: Int
     private(set) var progress: Int
     private(set) var danceMeter: Int
@@ -50,10 +57,28 @@ struct GameState: Equatable, Sendable {
         dancePartyTurnsRemaining > 0
     }
 
+    /// Endless begins at the familiar Classic pace, then adds pressure in
+    /// readable steps instead of ending when the progress meter fills.
+    var launchesPerAdvance: Int {
+        guard mode == .endless else { return rules.launchesPerAdvance }
+        let reduction = totalLaunches >= 60 ? 2 : (totalLaunches >= 24 ? 1 : 0)
+        return max(1, rules.launchesPerAdvance - reduction)
+    }
+
+    var launchesUntilAdvance: Int {
+        max(1, launchesPerAdvance - launchesSinceAdvance)
+    }
+
+    var endlessStage: Int {
+        max(1, totalLaunches / 24 + 1)
+    }
+
     init(
         board: Board = Board(),
         rules: GameRules = .bunnyLab,
+        mode: GameMode = .classic,
         launchesSinceAdvance: Int = 0,
+        totalLaunches: Int = 0,
         score: Int = 0,
         progress: Int = 0,
         danceMeter: Int = 0,
@@ -62,8 +87,10 @@ struct GameState: Equatable, Sendable {
         status: PlayStatus = .playing
     ) {
         self.rules = rules
+        self.mode = mode
         self.board = board
         self.launchesSinceAdvance = launchesSinceAdvance
+        self.totalLaunches = max(totalLaunches, 0)
         self.score = score
         self.progress = min(max(progress, 0), rules.progressTarget)
         self.danceMeter = min(max(danceMeter, 0), rules.danceTarget - 1)
@@ -155,9 +182,10 @@ struct GameState: Equatable, Sendable {
         let boardAfterResolution = board
 
         launchesSinceAdvance += 1
+        totalLaunches += 1
         var didAdvance = false
         var fallen: [Bunny] = []
-        if launchesSinceAdvance >= rules.launchesPerAdvance {
+        if launchesSinceAdvance >= launchesPerAdvance {
             // Advancement intentionally does not invoke the resolver. A passive
             // 3+ group waits for the next player-caused placement or active chain.
             fallen = board.advance(newBackRow: newBackRow)
@@ -180,10 +208,10 @@ struct GameState: Equatable, Sendable {
             dancePartyEnded = dancePartyTurnsRemaining == 0
         }
 
-        if progress >= rules.progressTarget {
-            status = .won
-        } else if danger >= rules.dangerLimit {
+        if danger >= rules.dangerLimit {
             status = .lost
+        } else if mode == .classic && progress >= rules.progressTarget {
+            status = .won
         }
 
         return TurnOutcome(

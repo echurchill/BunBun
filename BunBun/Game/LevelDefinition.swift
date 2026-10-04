@@ -167,6 +167,53 @@ enum LevelCatalog {
         birthdayBash
     ]
 
+    /// A separate, non-campaign ruleset. Its reused ID is intentionally never
+    /// recorded by CampaignController; GameMode controls end conditions.
+    static let endless = LevelDefinition(
+        id: .moonlightMeadow,
+        displayName: "Endless Boogie",
+        subtitle: "Keep matching while the crowd closes in",
+        theme: .meadow,
+        environment: .forestCampNight,
+        rules: GameRules(
+            launchesPerAdvance: 3,
+            progressTarget: 100,
+            progressPerMatchedBunny: 3,
+            progressPerSpecialEffectBunny: 1,
+            progressDecayPerAdvance: 3,
+            progressLostPerFallenBunny: 3,
+            dangerLimit: 100,
+            dangerPerFallenBunny: 8,
+            dangerReliefPerClearedBunny: 3,
+            danceTarget: 90,
+            danceChargePerMatchedBunny: 17,
+            danceChargePerSpecialEffectBunny: 7,
+            dancePartyLength: 4,
+            pointsPerRemovedBunny: 130
+        ),
+        startingLayout: nearMatchLayout(colorShift: 1, mirrored: true),
+        shotSequence: [
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .purple, kind: .lineClear),
+            PrototypeShot(color: .pink),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .purple),
+            PrototypeShot(color: .green),
+            PrototypeShot(color: .orange),
+            PrototypeShot(color: .blue),
+            PrototypeShot(color: .red, kind: .redBomb),
+            PrototypeShot(color: .purple, kind: .lineClear)
+        ],
+        arrivalPalette: [.green, .blue, .orange, .pink, .purple],
+        arrivalSeed: 11,
+        arrivalGapModulo: 7,
+        arrivalColorStride: 2,
+        arrivalTurnStride: 3,
+        tutorialPrompts: []
+    )
+
     static let bunnyLab = LevelDefinition(
         id: .bunnyLab,
         displayName: "Bunny Lab",

@@ -140,4 +140,29 @@ final class GamePressureTests: XCTestCase {
         XCTAssertEqual(state.progress, 100)
         XCTAssertEqual(state.status, .won)
     }
+
+    func testEndlessDoesNotWinWhenProgressFills() {
+        var board = Board()
+        XCTAssertTrue(board.place(Bunny(color: .pink), at: Cell(column: 2, row: 2)))
+        XCTAssertTrue(board.place(Bunny(color: .pink), at: Cell(column: 3, row: 2)))
+        var state = GameState(board: board, mode: .endless, progress: 91)
+
+        _ = state.launch(Bunny(color: .pink), from: .left, lane: 2)
+
+        XCTAssertEqual(state.progress, 100)
+        XCTAssertEqual(state.status, .playing)
+    }
+
+    func testEndlessPressureEscalatesAtDocumentedStages() {
+        let opening = GameState(mode: .endless, totalLaunches: 23)
+        let middle = GameState(mode: .endless, totalLaunches: 24)
+        let late = GameState(mode: .endless, totalLaunches: 60)
+
+        XCTAssertEqual(opening.launchesPerAdvance, 3)
+        XCTAssertEqual(middle.launchesPerAdvance, 2)
+        XCTAssertEqual(late.launchesPerAdvance, 1)
+        XCTAssertEqual(opening.endlessStage, 1)
+        XCTAssertEqual(middle.endlessStage, 2)
+        XCTAssertEqual(late.endlessStage, 3)
+    }
 }

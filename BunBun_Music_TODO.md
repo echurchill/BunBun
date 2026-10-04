@@ -130,7 +130,8 @@ The first adaptive audio vertical slice is now playable on iPhone, iPad, and App
 - The base and hook play during normal puzzle play.
 - The pressure stem fades in on a curved response to the danger meter rather than switching on abruptly.
 - Dance parties crossfade in brighter claps and a counter-melody without restarting or losing the beat.
-- A full-mix `BunBunThemePreview.wav` is retained beside the stems for quick listening outside the game.
+- A full-mix `BunBunThemePreview.wav` is retained in `Tools/AudioPreview` for quick listening outside the game. It is deliberately outside `BunBun/Resources/Audio`, whose whole-folder reference would otherwise embed it in every install.
+- Stem compression was evaluated in September 2026 and deferred: the stems stay sample-aligned mono WAVs to protect gapless 33-second loops, since lossy re-encoding needs device listening tests this environment cannot run. Apple Lossless remains the preferred future format when an encoder is available.
 
 The prototype score and effects are generated deterministically by `Tools/make_audio_assets.swift`. They contain no sampled commercial recording, no copied melody, no artist imitation, and no dependency on an AI-service license. Running this command regenerates the complete set:
 

@@ -4,6 +4,8 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var campaignController = CampaignController()
     @State private var selectedLevelID: LevelID?
+    @State private var isPlayingEndless = false
+    @AppStorage("BunBun.endlessBestScore") private var endlessBestScore = 0
 
     init() {
         var initialLevel: LevelID?
@@ -19,7 +21,25 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if let selectedLevelID {
+            if isPlayingEndless {
+                GameContainerView(
+                    level: LevelCatalog.endless,
+                    mode: .endless,
+                    hasNextLevel: false,
+                    onCompleted: { _, _ in },
+                    onRunEnded: { score in
+                        endlessBestScore = max(endlessBestScore, score)
+                    },
+                    onLevels: {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            isPlayingEndless = false
+                        }
+                    },
+                    onNext: {}
+                )
+                .id("endless")
+                .transition(.opacity)
+            } else if let selectedLevelID {
                 let level = LevelCatalog.definition(for: selectedLevelID)
                 GameContainerView(
                     level: level,
@@ -44,6 +64,12 @@ struct ContentView: View {
             } else {
                 LevelSelectionView(
                     controller: campaignController,
+                    endlessBestScore: $endlessBestScore,
+                    onSelectEndless: {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            isPlayingEndless = true
+                        }
+                    },
                     onSelect: { levelID in
                         withAnimation(.easeInOut(duration: 0.22)) {
                             selectedLevelID = levelID
@@ -59,6 +85,8 @@ struct ContentView: View {
 
 private struct LevelSelectionView: View {
     @ObservedObject var controller: CampaignController
+    @Binding var endlessBestScore: Int
+    let onSelectEndless: () -> Void
     let onSelect: (LevelID) -> Void
     @State private var showsResetConfirmation = false
     @AppStorage(AudioPreferences.mutedKey) private var audioMuted = false
@@ -82,13 +110,15 @@ private struct LevelSelectionView: View {
                     VStack(spacing: 5) {
                         Text("BUNBUN")
                             .font(.system(size: 38, weight: .black, design: .rounded))
-                        Text("BETH EDITION • PROTOTYPE 0.5")
+                        Text("BETH EDITION • \(AppVersion.prototypeTag)")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white.opacity(0.58))
                             .tracking(1.2)
                     }
                     .padding(.top, 32)
                     .padding(.bottom, 5)
+
+                    endlessCard
 
                     ForEach(Array(LevelCatalog.levels.enumerated()), id: \.element.id) { index, level in
                         if index == 0 || LevelCatalog.levels[index - 1].environment != level.environment {
@@ -119,9 +149,59 @@ private struct LevelSelectionView: View {
         ) {
             Button("Reset Progress", role: .destructive) {
                 controller.resetProgress()
+                endlessBestScore = 0
             }
             Button("Cancel", role: .cancel) {}
         }
+    }
+
+    private var endlessCard: some View {
+        Button(action: onSelectEndless) {
+            HStack(spacing: 15) {
+                ZStack {
+                    Image(LevelCatalog.endless.backgroundAssetName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 58, height: 68)
+                        .clipShape(RoundedRectangle(cornerRadius: 15))
+                    RoundedRectangle(cornerRadius: 15)
+                        .fill(Color.purple.opacity(0.22))
+                        .frame(width: 58, height: 68)
+                    Image(systemName: "infinity")
+                        .font(.system(size: 27, weight: .black))
+                        .shadow(color: .black.opacity(0.75), radius: 3)
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("ENDLESS BOOGIE")
+                        .font(.title3.weight(.heavy))
+                    Text("Keep matching while the crowd closes in")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.64))
+                    if endlessBestScore > 0 {
+                        Text("BEST SCORE  \(endlessBestScore)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.yellow.opacity(0.9))
+                    }
+                }
+
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.45))
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 98)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.purple.opacity(0.16))
+                    .stroke(Color.purple.opacity(0.42), lineWidth: 1)
+            )
+        }
+#if !os(tvOS)
+        .buttonStyle(.plain)
+#endif
+        .accessibilityHint("Starts an endless score run")
     }
 
     private var audioControls: some View {
@@ -142,7 +222,7 @@ private struct LevelSelectionView: View {
             )
             .disabled(audioMuted)
         }
-        .padding(16)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 18)
                 .fill(Color.white.opacity(0.065))
@@ -174,7 +254,9 @@ private struct LevelSelectionView: View {
         HStack(spacing: 12) {
             Text(title)
                 .font(.caption2.weight(.heavy))
-                .frame(width: 58, alignment: .leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 66, alignment: .leading)
 #if os(tvOS)
             Button {
                 value.wrappedValue = max(0, value.wrappedValue - 0.1)
@@ -196,7 +278,9 @@ private struct LevelSelectionView: View {
             Text("\(Int(value.wrappedValue * 100))%")
                 .font(.caption2.monospacedDigit().weight(.semibold))
                 .foregroundStyle(.white.opacity(0.62))
-                .frame(width: 38, alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 44, alignment: .trailing)
         }
     }
 
@@ -291,8 +375,10 @@ private final class GameSceneHolder: ObservableObject {
 
     init(
         level: LevelDefinition,
+        mode: GameMode,
         hasNextLevel: Bool,
         onCompleted: @escaping (LevelID, Int) -> Void,
+        onRunEnded: @escaping (Int) -> Void,
         onLevels: @escaping () -> Void,
         onNext: @escaping () -> Void
     ) {
@@ -304,8 +390,10 @@ private final class GameSceneHolder: ObservableObject {
         scene = GameScene(
             size: initialSize,
             level: level,
+            mode: mode,
             hasNextLevel: hasNextLevel,
             onLevelCompleted: onCompleted,
+            onRunEnded: onRunEnded,
             onRequestLevels: onLevels,
             onRequestNextLevel: onNext
         )
@@ -324,8 +412,10 @@ private struct GameContainerView: View {
 
     init(
         level: LevelDefinition,
+        mode: GameMode = .classic,
         hasNextLevel: Bool,
         onCompleted: @escaping (LevelID, Int) -> Void,
+        onRunEnded: @escaping (Int) -> Void = { _ in },
         onLevels: @escaping () -> Void,
         onNext: @escaping () -> Void
     ) {
@@ -333,8 +423,10 @@ private struct GameContainerView: View {
         self.onLevels = onLevels
         _holder = StateObject(wrappedValue: GameSceneHolder(
             level: level,
+            mode: mode,
             hasNextLevel: hasNextLevel,
             onCompleted: onCompleted,
+            onRunEnded: onRunEnded,
             onLevels: onLevels,
             onNext: onNext
         ))

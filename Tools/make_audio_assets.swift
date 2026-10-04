@@ -456,6 +456,10 @@ private func generateAssets() throws {
     let projectRoot = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
     let outputDirectory = projectRoot.appendingPathComponent("BunBun/Resources/Audio", isDirectory: true)
     try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+    // The listening preview stays outside Resources so the Audio folder
+    // reference never embeds it in the app bundle.
+    let previewDirectory = projectRoot.appendingPathComponent("Tools/AudioPreview", isDirectory: true)
+    try FileManager.default.createDirectory(at: previewDirectory, withIntermediateDirectories: true)
 
     let base = makeBase()
     let melody = makeMelody()
@@ -504,8 +508,8 @@ private func generateAssets() throws {
     for index in danceStinger.samples.indices where transitionSample + index < preview.samples.count {
         preview.samples[transitionSample + index] += danceStinger.samples[index] * 0.70
     }
-    try writeWAV(preview, to: outputDirectory.appendingPathComponent("BunBunThemePreview.wav"))
-    print("Wrote BunBunThemePreview.wav")
+    try writeWAV(preview, to: previewDirectory.appendingPathComponent("BunBunThemePreview.wav"))
+    print("Wrote Tools/AudioPreview/BunBunThemePreview.wav")
 }
 
 try generateAssets()

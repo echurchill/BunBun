@@ -19,15 +19,31 @@ private enum BunnyMotion: String {
 /// gameplay color keeps the same silhouette, lighting, eyes, and animation.
 @MainActor
 private final class BunnyAnimationLibrary {
+    private final class TextureSet: NSObject {
+        let textures: [SKTexture]
+
+        init(_ textures: [SKTexture]) {
+            self.textures = textures
+        }
+    }
+
     static let shared = BunnyAnimationLibrary()
 
-    private let context = CIContext(options: [.cacheIntermediates: true])
-    private var cache: [String: [SKTexture]] = [:]
+    private let context = CIContext(options: [.cacheIntermediates: false])
+    private let cache: NSCache<NSString, TextureSet> = {
+        let cache = NSCache<NSString, TextureSet>()
+        // Keep the six idle colors plus a handful of current action sets, but
+        // allow old motions to be regenerated instead of retaining hundreds
+        // of full-resolution frames for the life of the process.
+        cache.countLimit = 14
+        cache.totalCostLimit = 80 * 1_024 * 1_024
+        return cache
+    }()
 
     func textures(for motion: BunnyMotion, color: BunnyColor) -> [SKTexture] {
         let key = "\(motion.rawValue):\(color.rawValue)"
-        if let cached = cache[key] {
-            return cached
+        if let cached = cache.object(forKey: key as NSString) {
+            return cached.textures
         }
 
         guard let source = UIImage(named: motion.rawValue)?.cgImage else {
@@ -64,7 +80,11 @@ private final class BunnyAnimationLibrary {
             return texture
         }
 
-        cache[key] = textures
+        let approximateBytes = textures.count
+            * max(source.width / 4, 1)
+            * max(source.height / 2, 1)
+            * 4
+        cache.setObject(TextureSet(textures), forKey: key as NSString, cost: approximateBytes)
         return textures
     }
 

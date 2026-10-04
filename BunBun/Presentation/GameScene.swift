@@ -39,14 +39,11 @@ final class GameScene: SKScene {
         }
     }
 
-    private struct LaunchTarget {
-        let side: LaunchSide
-        let lane: Int
-    }
-
     private let level: LevelDefinition
+    private let mode: GameMode
     private let hasNextLevel: Bool
     private let onLevelCompleted: (LevelID, Int) -> Void
+    private let onRunEnded: (Int) -> Void
     private let onRequestLevels: () -> Void
     private let onRequestNextLevel: () -> Void
     private let audio = AudioDirector()
@@ -56,7 +53,9 @@ final class GameScene: SKScene {
     private var selectedSide: LaunchSide = .bottom
     private var highlightedLane: Int?
     private var isAnimating = false
+#if DEBUG
     private var showsDebug = false
+#endif
     private var showsDanceParty = false
     private var didReportCompletion = false
     private var didPlayEndCue = false
@@ -102,17 +101,21 @@ final class GameScene: SKScene {
     init(
         size: CGSize,
         level: LevelDefinition = LevelCatalog.bunnyLab,
+        mode: GameMode = .classic,
         hasNextLevel: Bool = false,
         onLevelCompleted: @escaping (LevelID, Int) -> Void = { _, _ in },
+        onRunEnded: @escaping (Int) -> Void = { _ in },
         onRequestLevels: @escaping () -> Void = {},
         onRequestNextLevel: @escaping () -> Void = {}
     ) {
         self.level = level
+        self.mode = mode
         self.hasNextLevel = hasNextLevel
         self.onLevelCompleted = onLevelCompleted
+        self.onRunEnded = onRunEnded
         self.onRequestLevels = onRequestLevels
         self.onRequestNextLevel = onRequestNextLevel
-        state = GameState(board: level.startingBoard(), rules: level.rules)
+        state = GameState(board: level.startingBoard(), rules: level.rules, mode: mode)
         super.init(size: size)
     }
 
@@ -161,15 +164,12 @@ final class GameScene: SKScene {
     }
 
     override func didFinishUpdate() {
-        enforceBunnyDisplaySizes(in: self)
-    }
-
-    private func enforceBunnyDisplaySizes(in parent: SKNode) {
-        for child in parent.children {
-            if let bunny = child as? BunnyNode {
-                bunny.enforceDisplaySize()
-            } else {
-                enforceBunnyDisplaySizes(in: child)
+        // BunnyNodes are always direct children of these three layers
+        // (board bunnies, projectiles, HUD preview), so scan them without
+        // recursing into the background, grid, stream, and effects subtrees.
+        for layer in [bunnyLayer, effectLayer, hudLayer] {
+            for child in layer.children {
+                (child as? BunnyNode)?.enforceDisplaySize()
             }
         }
     }
@@ -200,9 +200,11 @@ final class GameScene: SKScene {
             case "replay": resetGame()
             case "levels": onRequestLevels()
             case "next": onRequestNextLevel()
+#if DEBUG
             case "debug":
                 showsDebug.toggle()
                 renderAll()
+#endif
             default: break
             }
             return
@@ -251,6 +253,8 @@ final class GameScene: SKScene {
             self?.animateResolution(outcome)
         }
     }
+
+    // MARK: - Animation
 
     private func animateShot(
         bunny: Bunny,
@@ -640,316 +644,33 @@ final class GameScene: SKScene {
 
         let shade = SKShapeNode(rectOf: size)
         shade.position = CGPoint(x: size.width / 2, y: size.height / 2)
-        shade.fillColor = SKColor(white: 0, alpha: backgroundShadeAlpha)
+        shade.fillColor = SKColor(
+            white: 0,
+            alpha: SceneEnvironment.shadeAlpha(for: level.environment, isTablet: isTabletLayout)
+        )
         shade.strokeColor = .clear
         shade.zPosition = -99
         backgroundLayer.addChild(shade)
 
-        configureEnvironmentEffects(danceMode: showsDanceParty)
+        renderEnvironmentEffects(danceMode: showsDanceParty)
     }
 
-    private var backgroundShadeAlpha: CGFloat {
-        switch level.environment {
-        case .desertCamp: isTabletLayout ? 0.31 : 0.27
-        case .forestCampDay: isTabletLayout ? 0.30 : 0.26
-        case .forestCampNight: isTabletLayout ? 0.16 : 0.12
-        case .snowyWoodland: isTabletLayout ? 0.34 : 0.30
-        }
-    }
+    // MARK: - Environment
 
-    private func configureEnvironmentEffects(danceMode: Bool) {
-        ambientLightLayer.removeAllChildren()
-        switch level.environment {
-        case .desertCamp:
-            addDesertDust(danceMode: danceMode)
-        case .forestCampDay:
-            addFireflies(danceMode: danceMode)
-            addCampfire(danceMode: danceMode)
-        case .forestCampNight:
-            addStarTwinkles(danceMode: danceMode)
-            addLanternGlows(danceMode: danceMode)
-            addFriendlyTreeEyes(danceMode: danceMode)
-            addFireflies(danceMode: danceMode)
-            addCampfire(danceMode: danceMode)
-        case .snowyWoodland:
-            addSnowfall(danceMode: danceMode)
-            addWinterSparkles(danceMode: danceMode)
-        }
-    }
-
-    private func backgroundPoint(x: CGFloat, yFromTop: CGFloat) -> CGPoint {
-        CGPoint(
-            x: backgroundImageFrame.minX + x * backgroundImageFrame.width,
-            y: backgroundImageFrame.maxY - yFromTop * backgroundImageFrame.height
+    private func renderEnvironmentEffects(danceMode: Bool) {
+        SceneEnvironment.configure(
+            ambientLightLayer,
+            context: SceneEnvironment.Context(
+                size: size,
+                environment: level.environment,
+                backgroundFrame: backgroundImageFrame,
+                isTablet: isTabletLayout,
+                danceMode: danceMode
+            )
         )
     }
 
-    private func addPulsingGlow(
-        at position: CGPoint,
-        radius: CGFloat,
-        color: SKColor,
-        delay: TimeInterval,
-        danceMode: Bool
-    ) {
-        let light = SKShapeNode(circleOfRadius: radius)
-        light.position = position
-        light.fillColor = color
-        light.strokeColor = color.withAlphaComponent(0.42)
-        light.lineWidth = 0.8
-        light.glowWidth = radius * (danceMode ? 3.4 : 2.3)
-        light.blendMode = .add
-        light.alpha = 0.08
-        ambientLightLayer.addChild(light)
-        light.run(.sequence([
-            .wait(forDuration: delay),
-            .repeatForever(.sequence([
-                .group([
-                    .fadeAlpha(to: danceMode ? 0.78 : 0.46, duration: danceMode ? 0.20 : 0.55),
-                    .scale(to: danceMode ? 1.18 : 1.08, duration: danceMode ? 0.20 : 0.55)
-                ]),
-                .group([
-                    .fadeAlpha(to: danceMode ? 0.18 : 0.10, duration: danceMode ? 0.28 : 0.70),
-                    .scale(to: 0.90, duration: danceMode ? 0.28 : 0.70)
-                ]),
-                .wait(forDuration: danceMode ? 0.06 : 0.30)
-            ]))
-        ]))
-    }
-
-    private func addStarTwinkles(danceMode: Bool) {
-        let anchors = [
-            CGPoint(x: 0.26, y: 0.91), CGPoint(x: 0.34, y: 0.86),
-            CGPoint(x: 0.43, y: 0.94), CGPoint(x: 0.55, y: 0.88),
-            CGPoint(x: 0.66, y: 0.93), CGPoint(x: 0.75, y: 0.84),
-            CGPoint(x: 0.48, y: 0.80), CGPoint(x: 0.59, y: 0.77)
-        ]
-        let count = danceMode ? anchors.count : 4
-        for (index, point) in anchors.prefix(count).enumerated() {
-            addPulsingGlow(
-                at: CGPoint(x: point.x * size.width, y: point.y * size.height),
-                radius: isTabletLayout ? 2.6 : 1.8,
-                color: SKColor(white: 1, alpha: 0.88),
-                delay: Double(index) * 0.17,
-                danceMode: danceMode
-            )
-        }
-    }
-
-    private func addLanternGlows(danceMode: Bool) {
-        let anchors = [
-            backgroundPoint(x: 0.064, yFromTop: 0.214),
-            backgroundPoint(x: 0.908, yFromTop: 0.115),
-            backgroundPoint(x: 0.795, yFromTop: 0.220)
-        ]
-        for (index, point) in anchors.enumerated()
-        where point.x > -20 && point.x < size.width + 20 {
-            addPulsingGlow(
-                at: point,
-                radius: (isTabletLayout ? 7 : 5) + CGFloat(index),
-                color: SKColor(red: 1, green: 0.60, blue: 0.16, alpha: 0.72),
-                delay: Double(index) * 0.31,
-                danceMode: danceMode
-            )
-        }
-    }
-
-    private func addFriendlyTreeEyes(danceMode: Bool) {
-        let anchors = [
-            CGPoint(x: 0.10, y: 0.69), CGPoint(x: 0.91, y: 0.64),
-            CGPoint(x: 0.18, y: 0.79), CGPoint(x: 0.83, y: 0.75)
-        ]
-        let count = danceMode ? anchors.count : 2
-        for (index, anchor) in anchors.prefix(count).enumerated() {
-            let pair = SKNode()
-            pair.position = CGPoint(x: anchor.x * size.width, y: anchor.y * size.height)
-            pair.alpha = 0
-            for direction in [-1.0, 1.0] {
-                let eye = SKShapeNode(ellipseOf: CGSize(width: 3.2, height: 5.2))
-                eye.position.x = CGFloat(direction) * 4.2
-                eye.fillColor = SKColor(red: 1, green: 0.70, blue: 0.20, alpha: 0.86)
-                eye.strokeColor = .clear
-                eye.glowWidth = 3
-                pair.addChild(eye)
-            }
-            ambientLightLayer.addChild(pair)
-            pair.run(.sequence([
-                .wait(forDuration: 0.9 + Double(index) * 0.7),
-                .repeatForever(.sequence([
-                    .fadeAlpha(to: danceMode ? 0.82 : 0.50, duration: 0.35),
-                    .wait(forDuration: danceMode ? 0.65 : 1.45),
-                    .scaleY(to: 0.08, duration: 0.08),
-                    .scaleY(to: 1, duration: 0.10),
-                    .wait(forDuration: danceMode ? 0.45 : 1.6),
-                    .fadeOut(withDuration: 0.45),
-                    .wait(forDuration: danceMode ? 0.6 : 2.2)
-                ]))
-            ]))
-        }
-    }
-
-    private func addFireflies(danceMode: Bool) {
-        let count = danceMode ? 14 : 7
-        for index in 0..<count {
-            let x = CGFloat((index * 37 + 18) % 88 + 6) / 100
-            let y = CGFloat((index * 23 + 31) % 42 + 33) / 100
-            let radius: CGFloat = isTabletLayout ? 3.2 : 2.2
-            let firefly = SKShapeNode(circleOfRadius: radius)
-            firefly.position = CGPoint(x: x * size.width, y: y * size.height)
-            firefly.fillColor = SKColor(red: 0.92, green: 1, blue: 0.30, alpha: 0.86)
-            firefly.strokeColor = SKColor(white: 1, alpha: 0.38)
-            firefly.lineWidth = 0.7
-            firefly.glowWidth = radius * (danceMode ? 3.4 : 2.4)
-            firefly.blendMode = .add
-            firefly.alpha = 0.08
-            ambientLightLayer.addChild(firefly)
-
-            let bright: CGFloat = danceMode ? 0.84 : 0.54
-            let dim: CGFloat = danceMode ? 0.18 : 0.10
-            let blinkDuration = danceMode ? 0.12 : 0.24
-            let flicker = SKAction.repeat(.sequence([
-                .fadeAlpha(to: bright, duration: blinkDuration),
-                .fadeAlpha(to: dim, duration: blinkDuration * 1.25)
-            ]), count: 2 + index % 2)
-            let dx = CGFloat((index % 3) - 1) * (danceMode ? 24 : 15)
-                + CGFloat(index % 2 == 0 ? 7 : -7)
-            let dy = CGFloat(index % 2 == 0 ? 1 : -1) * (danceMode ? 17 : 10)
-            let secondDX = CGFloat(index % 2 == 0 ? -18 : 18)
-            let secondDY = CGFloat(index % 3 - 1) * (danceMode ? 13 : 8)
-            let moveDuration = danceMode ? 0.42 : 0.78
-            let relocate = { (x: CGFloat, y: CGFloat) in
-                SKAction.group([
-                    .moveBy(x: x, y: y, duration: moveDuration),
-                    .fadeAlpha(to: 0.06, duration: moveDuration * 0.45)
-                ])
-            }
-            firefly.run(.sequence([
-                .wait(forDuration: Double(index % 5) * 0.16),
-                .repeatForever(.sequence([
-                    flicker,
-                    relocate(dx, dy),
-                    flicker,
-                    relocate(secondDX, secondDY),
-                    flicker,
-                    relocate(-dx - secondDX, -dy - secondDY),
-                    .wait(forDuration: danceMode ? 0.08 : 0.35)
-                ]))
-            ]))
-        }
-    }
-
-    private func addCampfire(danceMode: Bool) {
-        let fire = SKNode()
-        fire.position = backgroundPoint(x: 0.755, yFromTop: 0.245)
-        fire.setScale(isTabletLayout ? 1.45 : 1)
-
-        for angle in [-0.34, 0.34] {
-            let log = SKShapeNode(rectOf: CGSize(width: 30, height: 6), cornerRadius: 3)
-            log.zRotation = angle
-            log.fillColor = SKColor(red: 0.24, green: 0.10, blue: 0.04, alpha: 0.95)
-            log.strokeColor = SKColor(red: 0.55, green: 0.25, blue: 0.08, alpha: 0.9)
-            fire.addChild(log)
-        }
-        let glow = SKShapeNode(circleOfRadius: danceMode ? 25 : 19)
-        glow.fillColor = SKColor(red: 1, green: 0.30, blue: 0.04, alpha: 0.12)
-        glow.strokeColor = .clear
-        glow.glowWidth = 16
-        glow.blendMode = .add
-        glow.zPosition = -1
-        fire.addChild(glow)
-        for (index, spec) in [(22.0, SKColor.systemOrange), (14.0, SKColor.systemYellow)].enumerated() {
-            let flame = SKShapeNode(ellipseOf: CGSize(width: CGFloat(spec.0) * 0.72, height: CGFloat(spec.0)))
-            flame.position.y = CGFloat(8 + index * 2)
-            flame.fillColor = spec.1.withAlphaComponent(0.88)
-            flame.strokeColor = .clear
-            flame.blendMode = .add
-            fire.addChild(flame)
-            flame.run(.repeatForever(.sequence([
-                .group([.scaleX(to: 0.74, duration: 0.16), .scaleY(to: 1.13, duration: 0.16)]),
-                .group([.scaleX(to: 1.08, duration: 0.20), .scaleY(to: 0.88, duration: 0.20)])
-            ])))
-        }
-        ambientLightLayer.addChild(fire)
-
-        for index in 0..<(danceMode ? 5 : 3) {
-            let smoke = SKShapeNode(circleOfRadius: CGFloat(5 + index % 2 * 2))
-            smoke.position = CGPoint(
-                x: fire.position.x + CGFloat(index - 2) * 3 * fire.xScale,
-                y: fire.position.y + 28 * fire.yScale
-            )
-            smoke.fillColor = SKColor(white: 0.76, alpha: 0.20)
-            smoke.strokeColor = .clear
-            ambientLightLayer.addChild(smoke)
-            let rise = CGFloat(42 + index * 7)
-            smoke.run(.sequence([
-                .wait(forDuration: Double(index) * 0.32),
-                .repeatForever(.sequence([
-                    .group([
-                        .moveBy(x: CGFloat(index % 2 == 0 ? -8 : 8), y: rise, duration: danceMode ? 1.15 : 1.8),
-                        .fadeOut(withDuration: danceMode ? 1.15 : 1.8),
-                        .scale(to: 1.8, duration: danceMode ? 1.15 : 1.8)
-                    ]),
-                    .moveBy(x: CGFloat(index % 2 == 0 ? 8 : -8), y: -rise, duration: 0),
-                    .scale(to: 1, duration: 0),
-                    .fadeAlpha(to: 0.20, duration: 0)
-                ]))
-            ]))
-        }
-    }
-
-    private func addDesertDust(danceMode: Bool) {
-        let count = danceMode ? 12 : 6
-        for index in 0..<count {
-            let mote = SKShapeNode(circleOfRadius: CGFloat(1 + index % 3))
-            mote.position = CGPoint(
-                x: CGFloat((index * 53 + 21) % 94 + 3) / 100 * size.width,
-                y: CGFloat((index * 29 + 18) % 54 + 22) / 100 * size.height
-            )
-            mote.fillColor = SKColor(red: 1, green: 0.78, blue: 0.42, alpha: 0.24)
-            mote.strokeColor = .clear
-            ambientLightLayer.addChild(mote)
-            let travel = danceMode ? size.width * 0.13 : size.width * 0.07
-            mote.run(.repeatForever(.sequence([
-                .group([.moveBy(x: travel, y: 5, duration: danceMode ? 0.9 : 1.8), .fadeAlpha(to: 0.48, duration: 0.5)]),
-                .group([.moveBy(x: -travel, y: -5, duration: danceMode ? 1.0 : 2.0), .fadeAlpha(to: 0.12, duration: 0.7)])
-            ])))
-        }
-    }
-
-    private func addSnowfall(danceMode: Bool) {
-        let count = danceMode ? 22 : 11
-        for index in 0..<count {
-            let flake = SKShapeNode(circleOfRadius: CGFloat(1 + index % 3))
-            flake.position = CGPoint(
-                x: CGFloat((index * 47 + 13) % 96 + 2) / 100 * size.width,
-                y: CGFloat((index * 31 + 20) % 68 + 26) / 100 * size.height
-            )
-            flake.fillColor = SKColor(white: 1, alpha: 0.46)
-            flake.strokeColor = .clear
-            ambientLightLayer.addChild(flake)
-            let fall = danceMode ? size.height * 0.08 : size.height * 0.05
-            flake.run(.repeatForever(.sequence([
-                .moveBy(x: CGFloat(index % 2 == 0 ? 9 : -9), y: -fall, duration: danceMode ? 0.8 : 1.6),
-                .moveBy(x: CGFloat(index % 2 == 0 ? -9 : 9), y: fall, duration: 0)
-            ])))
-        }
-    }
-
-    private func addWinterSparkles(danceMode: Bool) {
-        let anchors = [
-            CGPoint(x: 0.08, y: 0.74), CGPoint(x: 0.18, y: 0.85),
-            CGPoint(x: 0.82, y: 0.82), CGPoint(x: 0.93, y: 0.70),
-            CGPoint(x: 0.33, y: 0.91), CGPoint(x: 0.69, y: 0.92)
-        ]
-        for (index, anchor) in anchors.prefix(danceMode ? anchors.count : 3).enumerated() {
-            addPulsingGlow(
-                at: CGPoint(x: anchor.x * size.width, y: anchor.y * size.height),
-                radius: isTabletLayout ? 3.5 : 2.5,
-                color: SKColor(red: 0.68, green: 0.91, blue: 1, alpha: 0.76),
-                delay: Double(index) * 0.24,
-                danceMode: danceMode
-            )
-        }
-    }
+    // MARK: - Board Layout
 
     private func layoutBoard() {
         let horizontalPadding: CGFloat
@@ -1252,160 +973,81 @@ final class GameScene: SKScene {
         }
     }
 
+    // MARK: - HUD
+
     private func drawHUD() {
-        hudLayer.removeAllChildren()
-
-        let title = SKLabelNode(fontNamed: "AvenirNext-Heavy")
-        title.text = "BUNBUN  •  \(level.displayName.uppercased()) 0.5"
-        title.fontSize = (level.displayName.count > 14 ? 16 : 19) * hudScale
-        title.fontColor = .white
-        title.position = CGPoint(x: size.width / 2, y: size.height - 82)
-        hudLayer.addChild(title)
-
-        let subtitle = SKLabelNode(fontNamed: "AvenirNext-Medium")
-        subtitle.text = level.prompt(at: currentShotIndex)
-        subtitle.fontSize = 12 * hudScale
-        subtitle.fontColor = SKColor(white: 0.72, alpha: 1)
-        subtitle.position = CGPoint(x: size.width / 2, y: title.position.y - 24)
-        hudLayer.addChild(subtitle)
-
-        let controlInset: CGFloat = isTelevisionLayout ? 150 : (isTabletLayout ? 90 : 58)
-        addControl(name: "debug", text: showsDebug ? "DEBUG ON" : "DEBUG", x: controlInset)
-        addControl(name: "restart", text: "RESTART", x: size.width - controlInset)
-
-        let preferredMeterWidth: CGFloat = isTelevisionLayout ? 230 : (isTabletLayout ? 150 : 92)
-        let meterWidth = min(preferredMeterWidth, (size.width - 48) / 3)
-        let meterY = size.height - 166
-        addMeter(
-            title: "PROGRESS",
-            value: state.progress,
-            maximumValue: state.rules.progressTarget,
-            color: .systemGreen,
-            x: size.width * 0.22,
-            y: meterY,
-            width: meterWidth
-        )
-        addMeter(
-            title: state.isDancePartyActive ? "DANCE ×2 (\(state.dancePartyTurnsRemaining))" : "DANCE",
-            value: state.danceMeter,
-            maximumValue: state.rules.danceTarget,
-            color: state.isDancePartyActive ? .systemYellow : .systemPurple,
-            x: size.width * 0.50,
-            y: meterY,
-            width: meterWidth
-        )
-        addMeter(
-            title: "DANGER",
-            value: state.danger,
-            maximumValue: state.rules.dangerLimit,
-            color: .systemRed,
-            x: size.width * 0.78,
-            y: meterY,
-            width: meterWidth
-        )
-
         let shot = level.shot(at: currentShotIndex)
-        let previewBunny = shot.makeBunny()
-        let preview = BunnyNode(
-            bunny: previewBunny,
-            cellWidth: 22,
-            cellHeight: 31,
-            color: spriteColor(for: shot.color)
-        )
-        let previewY = isLargeScreenLayout ? max(72, boardOrigin.y - cellHeight * 1.6) : 69
-        let previewOffset: CGFloat = isTelevisionLayout ? 150 : (isTabletLayout ? 95 : 75)
-        preview.position = CGPoint(x: size.width / 2 - previewOffset, y: previewY)
-        preview.setScale(isTelevisionLayout ? 1.35 : (isTabletLayout ? 1.05 : 0.82))
-        hudLayer.addChild(preview)
-
-        let label = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
-        let multiplier = state.isDancePartyActive ? "   •   2×" : ""
-        let nextName = switch shot.kind {
-        case .normal: "Next"
-        case .redBomb: "Next BOMB"
-        case .lineClear: "Next LINE"
-        }
-        label.text = "\(nextName)   •   Score \(state.score)   •   Hop in \(state.rules.launchesPerAdvance - state.launchesSinceAdvance)\(multiplier)"
-        label.fontSize = 12 * hudScale
-        label.fontColor = .white
-        label.horizontalAlignmentMode = .left
-        label.verticalAlignmentMode = .center
-        label.position = CGPoint(x: preview.position.x + 20, y: preview.position.y)
-        hudLayer.addChild(label)
-
 #if os(tvOS)
-        let remoteHelp = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
-        remoteHelp.text = "◀︎ ▶︎ SIDE    ▲ ▼ LANE    SELECT LAUNCH    PLAY/PAUSE PAUSE    MENU LEVELS"
-        remoteHelp.fontSize = 12 * hudScale
-        remoteHelp.fontColor = SKColor(white: 0.86, alpha: 0.92)
-        remoteHelp.position = CGPoint(x: size.width / 2, y: 42)
-        hudLayer.addChild(remoteHelp)
-
-        let selection = SKLabelNode(fontNamed: "AvenirNext-Heavy")
-        selection.text = "\(selectedSide.rawValue.uppercased())  •  LANE \((highlightedLane ?? 0) + 1)"
-        selection.fontSize = 13 * hudScale
-        selection.fontColor = .systemYellow
-        selection.position = CGPoint(x: size.width / 2, y: 75)
-        hudLayer.addChild(selection)
+        let televisionStatus: String? = "\(selectedSide.rawValue.uppercased())  •  LANE \((highlightedLane ?? 0) + 1)"
+#else
+        let televisionStatus: String? = nil
 #endif
-
-        if showsDebug {
-            let debug = SKLabelNode(fontNamed: "Menlo")
-            debug.text = "side=\(selectedSide.rawValue)  occupied=\(state.board.occupants.count)  state=\(state.status)"
-            debug.fontSize = 9 * hudScale
-            debug.fontColor = .systemGreen
-            debug.position = CGPoint(x: size.width / 2, y: 38)
-            hudLayer.addChild(debug)
-        }
+        HUD.render(in: hudLayer, context: HUD.Context(
+            size: size,
+            boardOriginY: boardOrigin.y,
+            cellHeight: cellHeight,
+            isTablet: isTabletLayout,
+            isTelevision: isTelevisionLayout,
+            hudScale: hudScale,
+            levelName: level.displayName,
+            appVersion: AppVersion.marketingVersion,
+            subtitle: mode == .endless
+                ? "Keep matching — pressure rises every 24 hops"
+                : level.prompt(at: currentShotIndex),
+            debugControlText: debugControlText(),
+            debugLine: debugLine(),
+            meters: [
+                mode == .endless
+                    ? HUD.Meter(
+                        title: "STAGE \(state.endlessStage)",
+                        value: state.totalLaunches % 24,
+                        maximumValue: 24,
+                        color: .systemGreen
+                    )
+                    : HUD.Meter(
+                        title: "PROGRESS",
+                        value: state.progress,
+                        maximumValue: state.rules.progressTarget,
+                        color: .systemGreen
+                    ),
+                HUD.Meter(
+                    title: state.isDancePartyActive ? "DANCE ×2 (\(state.dancePartyTurnsRemaining))" : "DANCE",
+                    value: state.danceMeter,
+                    maximumValue: state.rules.danceTarget,
+                    color: state.isDancePartyActive ? .systemYellow : .systemPurple
+                ),
+                HUD.Meter(
+                    title: "DANGER",
+                    value: state.danger,
+                    maximumValue: state.rules.dangerLimit,
+                    color: .systemRed
+                ),
+            ],
+            previewBunny: shot.makeBunny(),
+            previewTint: spriteColor(for: shot.color),
+            shotKind: shot.kind,
+            score: state.score,
+            launchesUntilAdvance: state.launchesUntilAdvance,
+            danceActive: state.isDancePartyActive,
+            televisionStatus: televisionStatus
+        ))
     }
 
-    private func addControl(name: String, text: String, x: CGFloat) {
-        let node = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        node.name = "control:\(name)"
-        node.text = text
-        node.fontSize = 10 * hudScale
-        node.fontColor = SKColor(white: 0.70, alpha: 1)
-        node.position = CGPoint(x: x, y: size.height - 132)
-        hudLayer.addChild(node)
+    private func debugControlText() -> String? {
+#if DEBUG
+        showsDebug ? "DEBUG ON" : "DEBUG"
+#else
+        nil
+#endif
     }
 
-    private func addMeter(
-        title: String,
-        value: Int,
-        maximumValue: Int,
-        color: SKColor,
-        x: CGFloat,
-        y: CGFloat,
-        width: CGFloat
-    ) {
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        label.text = title
-        label.fontSize = 8 * hudScale
-        label.fontColor = SKColor(white: 0.72, alpha: 1)
-        label.position = CGPoint(x: x, y: y + 9)
-        hudLayer.addChild(label)
-
-        let track = SKShapeNode(rectOf: CGSize(width: width, height: 7), cornerRadius: 3.5)
-        track.position = CGPoint(x: x, y: y - 2)
-        track.fillColor = SKColor(white: 0.17, alpha: 1)
-        track.strokeColor = SKColor(white: 0.35, alpha: 1)
-        track.lineWidth = 1
-        hudLayer.addChild(track)
-
-        // Game-state meters are bounded, but clamp at the presentation boundary
-        // as well so malformed/debug state can never draw outside its track.
-        let fraction = min(
-            1,
-            max(0, CGFloat(value) / CGFloat(max(maximumValue, 1)))
-        )
-        let fillWidth = width * fraction
-        guard fillWidth > 0 else { return }
-        let fill = SKShapeNode(rectOf: CGSize(width: fillWidth, height: 5), cornerRadius: 2.5)
-        fill.position = CGPoint(x: x - width / 2 + fillWidth / 2, y: y - 2)
-        fill.fillColor = color
-        fill.strokeColor = .clear
-        fill.zPosition = 1
-        hudLayer.addChild(fill)
+    private func debugLine() -> String? {
+#if DEBUG
+        guard showsDebug else { return nil }
+        return "side=\(selectedSide.rawValue)  occupied=\(state.board.occupants.count)  state=\(state.status)"
+#else
+        return nil
+#endif
     }
 
     private func projectileStartPosition(for side: LaunchSide, lane: Int) -> CGPoint {
@@ -1439,33 +1081,19 @@ final class GameScene: SKScene {
         updateAimReactions()
     }
 
-    private func launchTarget(at point: CGPoint) -> LaunchTarget? {
-        let row = Int(((point.y - boardOrigin.y) / cellHeight).rounded(.down))
-        let isWithinBoardHeight = row >= 0 && row < state.board.rowCount
-        let sideHitSlop = max(12, cellWidth * 0.25)
-
-        if isWithinBoardHeight,
-           point.x >= boardOrigin.x - sideHitSlop,
-           point.x < boardOrigin.x + cellWidth {
-            return LaunchTarget(side: .left, lane: row)
-        }
-
-        if isWithinBoardHeight,
-           point.x >= boardOrigin.x + boardWidth - cellWidth,
-           point.x < boardOrigin.x + boardWidth + sideHitSlop {
-            return LaunchTarget(side: .right, lane: row)
-        }
-
-        let bottomZoneHeight = max(52, cellHeight * 1.15)
-        let isWithinBottomZone = point.y >= boardOrigin.y - bottomZoneHeight
-            && point.y < boardOrigin.y
-        guard isWithinBottomZone,
-              point.x >= boardOrigin.x,
-              point.x < boardOrigin.x + boardWidth else { return nil }
-
-        let column = Int((point.x - boardOrigin.x) / cellWidth)
-        guard column >= 0, column < state.board.columnCount else { return nil }
-        return LaunchTarget(side: .bottom, lane: column)
+    private func launchTarget(at point: CGPoint) -> LaunchZones.Target? {
+        LaunchZones.target(
+            at: point,
+            layout: LaunchZones.Layout(
+                size: size,
+                boardOrigin: boardOrigin,
+                cellWidth: cellWidth,
+                cellHeight: cellHeight,
+                boardWidth: boardWidth,
+                rowCount: state.board.rowCount,
+                columnCount: state.board.columnCount
+            )
+        )
     }
 
     private func updateAimReactions() {
@@ -1734,7 +1362,7 @@ final class GameScene: SKScene {
             audio.play(.dance)
             audio.updateMix(danger: dangerFraction, danceActive: true, fadeDuration: 0.22)
             showsDanceParty = true
-            configureEnvironmentEffects(danceMode: true)
+            renderEnvironmentEffects(danceMode: true)
             configureDancePartyBackdrop()
             updateBunnies(outcome.boardAfterResolution)
             flashMessage("DANCE PARTY!  2×", color: .systemYellow)
@@ -1742,7 +1370,7 @@ final class GameScene: SKScene {
         } else if outcome.dancePartyEnded {
             audio.updateMix(danger: dangerFraction, danceActive: false, fadeDuration: 0.55)
             showsDanceParty = false
-            configureEnvironmentEffects(danceMode: false)
+            renderEnvironmentEffects(danceMode: false)
             partyLayer.removeAllChildren()
             backgroundColor = themeBackgroundColor
         }
@@ -1770,6 +1398,8 @@ final class GameScene: SKScene {
         }
     }
 
+    // MARK: - End of Run
+
     private func showEndStateIfNeeded() {
         guard state.status != .playing else { return }
         if !didPlayEndCue {
@@ -1778,85 +1408,32 @@ final class GameScene: SKScene {
             audio.updateMix(danger: dangerFraction, danceActive: false, fadeDuration: 0.8)
         }
         playtestStats.finish()
-        let panelHeight: CGFloat = state.status == .won ? 250 : 222
-        let panel = SKShapeNode(
-            rectOf: CGSize(width: min(isTabletLayout ? 420 : 330, size.width - 38), height: panelHeight),
-            cornerRadius: 18
-        )
-        panel.fillColor = SKColor(white: 0.05, alpha: 0.92)
-        panel.strokeColor = state.status == .won ? .systemGreen : .systemPink
-        panel.lineWidth = 3
-        panel.position = CGPoint(x: size.width / 2, y: boardOrigin.y + boardHeight / 2)
-        panel.zPosition = 60
-        effectLayer.addChild(panel)
-
-        let title = SKLabelNode(fontNamed: "AvenirNext-Heavy")
-        title.text = state.status == .won ? "LEVEL COMPLETE!" : "BUNNIES NEED A BREAK"
-        title.fontSize = state.status == .won ? 23 : 18
-        title.fontColor = .white
-        title.verticalAlignmentMode = .center
-        title.position.y = panelHeight / 2 - 35
-        panel.addChild(title)
-
-        let prompt = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
-        prompt.text = state.status == .won
-            ? "Score \(state.score)"
-            : "Score \(state.score)  •  Ready to try again"
-        prompt.fontSize = 12
-        prompt.fontColor = SKColor(white: 0.75, alpha: 1)
-        prompt.verticalAlignmentMode = .center
-        prompt.position.y = panelHeight / 2 - 64
-        panel.addChild(prompt)
-
-        let activity = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
-        activity.text = "Launches \(playtestStats.launches)  •  Falls \(playtestStats.falls)"
-        activity.fontSize = 11
-        activity.fontColor = SKColor(white: 0.82, alpha: 1)
-        activity.verticalAlignmentMode = .center
-        activity.position.y = panelHeight / 2 - 90
-        panel.addChild(activity)
-
-        let events = SKLabelNode(fontNamed: "AvenirNext-Medium")
-        events.text = "Specials \(playtestStats.specialActivations)  •  Parties \(playtestStats.danceParties)  •  \(playtestStats.elapsedSeconds)s"
-        events.fontSize = 10
-        events.fontColor = SKColor(white: 0.68, alpha: 1)
-        events.verticalAlignmentMode = .center
-        events.position.y = panelHeight / 2 - 111
-        panel.addChild(events)
-
-        if state.status == .won {
-            if hasNextLevel {
-                addEndButton(to: panel, name: "next", text: "NEXT LEVEL", y: -24)
-            }
-            addEndButton(to: panel, name: "replay", text: "REPLAY", y: hasNextLevel ? -62 : -38)
-            addEndButton(to: panel, name: "levels", text: "LEVELS", y: hasNextLevel ? -100 : -80)
-            addConfetti(for: 5)
-            if !didReportCompletion {
-                didReportCompletion = true
+        effectLayer.addChild(EndPanel.makeNode(context: EndPanel.Context(
+            status: state.status,
+            score: state.score,
+            stats: EndPanel.RunStats(
+                launches: playtestStats.launches,
+                falls: playtestStats.falls,
+                specialActivations: playtestStats.specialActivations,
+                danceParties: playtestStats.danceParties,
+                elapsedSeconds: playtestStats.elapsedSeconds
+            ),
+            hasNextLevel: mode == .classic && hasNextLevel,
+            size: size,
+            boardCenter: CGPoint(x: boardOrigin.x + boardWidth / 2, y: boardOrigin.y + boardHeight / 2),
+            isTablet: isTabletLayout,
+            panelScale: isTelevisionLayout ? hudScale : 1
+        )))
+        if !didReportCompletion {
+            didReportCompletion = true
+            onRunEnded(state.score)
+            if state.status == .won {
                 onLevelCompleted(level.id, state.score)
             }
-        } else {
-            addEndButton(to: panel, name: "replay", text: "RETRY", y: -43)
-            addEndButton(to: panel, name: "levels", text: "LEVELS", y: -83)
         }
-    }
-
-    private func addEndButton(to panel: SKNode, name: String, text: String, y: CGFloat) {
-        let button = SKShapeNode(rectOf: CGSize(width: 174, height: 31), cornerRadius: 10)
-        button.name = "control:\(name)"
-        button.position.y = y
-        button.fillColor = name == "next" ? .systemGreen : SKColor(white: 0.18, alpha: 1)
-        button.strokeColor = name == "next" ? .white : SKColor(white: 0.46, alpha: 1)
-        button.lineWidth = name == "next" ? 2 : 1
-        panel.addChild(button)
-
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        label.name = button.name
-        label.text = text
-        label.fontSize = 12
-        label.fontColor = .white
-        label.verticalAlignmentMode = .center
-        button.addChild(label)
+        if state.status == .won {
+            addConfetti(for: 5)
+        }
     }
 
     private func flashMessage(_ text: String, color: SKColor) {
@@ -1913,7 +1490,7 @@ final class GameScene: SKScene {
     private func resetGame() {
         removeAllActions()
         effectLayer.removeAllChildren()
-        state = GameState(board: level.startingBoard(), rules: level.rules)
+        state = GameState(board: level.startingBoard(), rules: level.rules, mode: mode)
         currentShotIndex = 0
 #if os(tvOS)
         selectedSide = .left
@@ -1943,6 +1520,8 @@ final class GameScene: SKScene {
     }
 
 #if os(tvOS)
+    // MARK: - Television
+
     private var maximumTelevisionLane: Int {
         selectedSide == .bottom ? state.board.columnCount - 1 : state.board.rowCount - 1
     }

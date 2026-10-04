@@ -38,7 +38,7 @@ enum AudioCue: CaseIterable, Hashable, Sendable {
     case win
     case lose
 
-    fileprivate var resourceName: String {
+    var resourceName: String {
         switch self {
         case .launch: "SFXLaunch"
         case .blocked: "SFXBlocked"
@@ -74,7 +74,9 @@ enum AudioCue: CaseIterable, Hashable, Sendable {
 /// Presentation-only adaptive audio. The four loop files share the same length,
 /// tempo, and start time, so changing their volumes never restarts the groove.
 final class AudioDirector: @unchecked Sendable {
-    private enum MusicLayer: String, CaseIterable, Sendable {
+    // Internal (not private) so tests can verify every stem resolves to a
+    // bundled file; the mapping itself stays owned by this file.
+    enum MusicLayer: String, CaseIterable, Sendable {
         case base = "MusicBase"
         case melody = "MusicMelody"
         case pressure = "MusicPressure"

@@ -72,7 +72,7 @@ Keep compatibility helpers only as long as needed to avoid a large, risky rewrit
 ### Level selection
 
 - Add a simple native level-selection screen or overlay.
-- Show the three levels in order.
+- Show the twelve levels in order.
 - Lock later levels until the previous level is completed.
 - Display the best score for completed levels.
 - Include a reset-progress control behind a confirmation step.
@@ -134,7 +134,7 @@ Existing matching, chain, special, and pressure tests must continue passing.
 
 On a physical iPhone:
 
-- Complete all three levels in sequence.
+- Complete all twelve levels in sequence.
 - Force a loss and retry.
 - Leave and relaunch the app to verify saved unlocks and scores.
 - Replay an earlier level and improve its score.
@@ -158,7 +158,7 @@ Prototype 0.5 will not include:
 
 Prototype 0.5 is complete when:
 
-- Three data-driven levels can be selected and played.
+- Twelve data-driven levels can be selected and played.
 - Winning unlocks the next level and persists across launches.
 - Each level has measurably different rules or content rather than only a different title.
 - Win, loss, retry, replay, and return-to-levels flows work on a physical iPhone.
@@ -191,7 +191,7 @@ Prototype 0.5 is complete when:
 - Added subtle code-driven ambient light glimmers, with a denser and faster lighting pass during dance parties.
 - Added the shared background thumbnails to the level picker so paired stages are visually related.
 
-The remaining completion gate is hands-on playtesting of all three levels on physical iPhone and iPad hardware, followed by tuning from the recorded launch counts, falls, specials, and dance parties.
+The remaining completion gate is hands-on playtesting of all twelve levels on physical iPhone and iPad hardware, followed by tuning from the recorded launch counts, falls, specials, and dance parties.
 
 ## Apple TV feasibility milestone — September 26, 2026
 
@@ -217,6 +217,14 @@ Remaining television checks are hands-on remote navigation, a complete level pla
 - Verified successful iOS and tvOS builds, resource embedding, Apple TV simulator launch, remote level selection, a scoring match, and active Core Audio playback queues.
 
 Remaining audio work is subjective listening and mix tuning on physical iPhone, iPad, and Apple TV speakers; longer fatigue testing; gapless-loop confirmation; and selection or production of the final licensed score.
+
+## Campaign expansion to twelve levels — September 26–27, 2026
+
+- Expanded the campaign from six to twelve data-driven levels while retaining sequential unlocking, per-level tuning, and best scores.
+- Regrouped the campaign into four three-level environment sets: Sunset Camp (Bunny Lab, Carrot Works, Sunset Shuffle), Springtime Camp (Meadow Warmup, Riverside Romp, Campfire Cadence), Moonlit Camp (Moonlight Meadow, Firefly Falls, Midnight Encore), and Winter Camp (Dance Rehearsal, Snowflake Shuffle, Birthday Bash).
+- Brought the Day Forest Camp plate into active use as Springtime Camp, so all four background plates now back playable levels.
+- Added world headers to the level picker so each environment set reads as one chapter.
+- Playtest launch-count targets for the original three levels still apply to those levels; the nine newer levels need their own physical-device launch-count baselines before difficulty tuning.
 
 ## Recommended implementation order
 
