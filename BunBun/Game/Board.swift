@@ -91,11 +91,12 @@ struct Board: Equatable, Sendable {
         return .placed(target)
     }
 
-    /// Closes holes after a successful clear by packing each column against
-    /// the back/arrival edge. Clearing bunnies therefore creates space near
-    /// the hazard; only Classic advancement moves the formation toward danger.
-    mutating func compactAwayFromHazard() {
-        for column in 0..<columnCount {
+    /// Closes holes created by a successful clear, but only in columns touched
+    /// by that clear. Repacking every column made an unrelated arrival gap pull
+    /// its entire column backward, often immediately before the next Classic
+    /// advancement moved it forward again.
+    mutating func compactAwayFromHazard(in affectedColumns: Set<Int>) {
+        for column in affectedColumns where (0..<columnCount).contains(column) {
             let bunnies = occupants
                 .filter { $0.key.column == column }
                 .sorted { $0.key.row < $1.key.row }

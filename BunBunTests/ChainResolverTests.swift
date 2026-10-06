@@ -2,6 +2,57 @@ import XCTest
 @testable import BunBun
 
 final class ChainResolverTests: XCTestCase {
+    func testOpeningMatchMovesOnlyBunniesBelowTheClearedRowBackward() throws {
+        var board = LevelCatalog.bunnyLab.startingBoard()
+        let launch = board.launch(Bunny(color: .blue), from: .left, lane: 5)
+        guard case let .placed(origin) = launch else {
+            return XCTFail("Opening tutorial shot should be placed")
+        }
+
+        let result = ChainResolver().resolve(board: board, triggeredBy: origin)
+        let stage = try XCTUnwrap(result.stages.first)
+        let oldCells = Dictionary(uniqueKeysWithValues: stage.boardBefore.occupants.map { ($0.value.id, $0.key) })
+        let newCells = Dictionary(uniqueKeysWithValues: stage.boardAfter.occupants.map { ($0.value.id, $0.key) })
+        let movements = oldCells.compactMap { id, oldCell -> (Cell, Cell)? in
+            guard let newCell = newCells[id], newCell != oldCell else { return nil }
+            return (oldCell, newCell)
+        }
+
+        XCTAssertEqual(movements.count, 3)
+        XCTAssertTrue(movements.allSatisfy { oldCell, newCell in
+            (1...3).contains(oldCell.column)
+                && oldCell.row == 4
+                && newCell == Cell(column: oldCell.column, row: 5)
+        })
+    }
+
+    func testMatchDoesNotPullAnUntouchedGappedColumnBackward() throws {
+        var board = Board()
+        for column in 2...4 {
+            XCTAssertTrue(board.place(Bunny(color: .pink), at: Cell(column: column, row: 4)))
+        }
+
+        let untouchedBunnies = [
+            Bunny(color: .blue),
+            Bunny(color: .green),
+            Bunny(color: .orange)
+        ]
+        for (row, bunny) in zip(3...5, untouchedBunnies) {
+            XCTAssertTrue(board.place(bunny, at: Cell(column: 8, row: row)))
+        }
+
+        let result = ChainResolver().resolve(
+            board: board,
+            triggeredBy: Cell(column: 3, row: 4)
+        )
+
+        let stage = try XCTUnwrap(result.stages.first)
+        for (row, bunny) in zip(3...5, untouchedBunnies) {
+            XCTAssertEqual(stage.boardAfter[Cell(column: 8, row: row)], bunny)
+        }
+        XCTAssertNil(stage.boardAfter[Cell(column: 8, row: 7)])
+    }
+
     func testCompactionCreatesSecondChainStage() {
         var board = Board()
 
@@ -80,7 +131,7 @@ final class ChainResolverTests: XCTestCase {
         XCTAssertTrue(result.stages[0].removedCells.contains(nearby))
         XCTAssertEqual(result.stages[0].specialActivations.map(\.kind), [.redBomb])
         XCTAssertEqual(result.specialEffectRemovedCount, 1)
-        XCTAssertNotNil(result.board[Cell(column: farAway.column, row: 7)])
+        XCTAssertEqual(result.board[farAway], board[farAway])
     }
 
     func testMatchedLineBunnyClearsItsRowAndColumn() {
@@ -104,7 +155,7 @@ final class ChainResolverTests: XCTestCase {
         XCTAssertTrue(result.stages[0].removedCells.isSuperset(of: Set([sameRow, sameColumn])))
         XCTAssertEqual(result.stages[0].specialActivations.map(\.kind), [.lineClear])
         XCTAssertEqual(result.specialEffectRemovedCount, 2)
-        XCTAssertNotNil(result.board[Cell(column: untouched.column, row: 7)])
+        XCTAssertEqual(result.board[untouched], board[untouched])
     }
 
     func testSpecialCaughtByBombActivatesInSameStage() {

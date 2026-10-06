@@ -1,8 +1,7 @@
-import CoreImage
 import SpriteKit
 import UIKit
 
-private enum BunnyMotion: String {
+private enum BunnyMotion: String, CaseIterable {
     case idle = "BunnyIdleSheet"
     case aim = "BunnyAimSheet"
     case celebration = "BunnyCelebrateSheet"
@@ -15,8 +14,65 @@ private enum BunnyMotion: String {
     case rescue = "BunnyRescueSheet"
 }
 
-/// Splits the generated 4x2 sheets and hue-shifts the blue master art so every
-/// gameplay color keeps the same silhouette, lighting, eyes, and animation.
+/// Recolors the shared blue animation art on the GPU. Hue rotation preserves
+/// black eyes, white highlights, and shading while avoiding six full texture
+/// copies of every motion in memory.
+@MainActor
+private enum BunnyHueShaderLibrary {
+    private static let source = """
+    vec3 rotateHue(vec3 color, float angle) {
+        float y = dot(color, vec3(0.299, 0.587, 0.114));
+        float i = dot(color, vec3(0.596, -0.274, -0.322));
+        float q = dot(color, vec3(0.211, -0.523, 0.312));
+        float cosine = cos(angle);
+        float sine = sin(angle);
+        float rotatedI = i * cosine - q * sine;
+        float rotatedQ = i * sine + q * cosine;
+        return vec3(
+            y + 0.956 * rotatedI + 0.621 * rotatedQ,
+            y - 0.272 * rotatedI - 0.647 * rotatedQ,
+            y - 1.106 * rotatedI + 1.703 * rotatedQ
+        );
+    }
+
+    void main() {
+        vec4 pixel = texture2D(u_texture, v_tex_coord);
+        vec3 shifted = rotateHue(pixel.rgb, u_hueAngle);
+        shifted = clamp(shifted, vec3(0.0), vec3(pixel.a));
+        gl_FragColor = vec4(shifted, pixel.a) * v_color_mix.a;
+    }
+    """
+
+    private static let shaders: [BunnyColor: SKShader] = Dictionary(
+        uniqueKeysWithValues: BunnyColor.allCases.compactMap { color in
+            guard color != .blue else { return nil }
+            let shader = SKShader(
+                source: source,
+                uniforms: [SKUniform(name: "u_hueAngle", float: Float(-hueAngle(for: color)))]
+            )
+            return (color, shader)
+        }
+    )
+
+    static func shader(for color: BunnyColor) -> SKShader? {
+        shaders[color]
+    }
+
+    private static func hueAngle(for color: BunnyColor) -> CGFloat {
+        switch color {
+        case .blue: 0
+        case .green: -1.30
+        case .orange: -2.95
+        case .pink: 2.10
+        case .purple: 1.15
+        case .red: 2.62
+        }
+    }
+}
+
+/// Splits the pre-cleaned 4x2 sheets once per motion. Color is supplied by the
+/// sprite shader, so every bunny shares these textures and the live animation
+/// path never performs image cleanup or Core Image rendering.
 @MainActor
 private final class BunnyAnimationLibrary {
     private final class TextureSet: NSObject {
@@ -29,19 +85,17 @@ private final class BunnyAnimationLibrary {
 
     static let shared = BunnyAnimationLibrary()
 
-    private let context = CIContext(options: [.cacheIntermediates: false])
     private let cache: NSCache<NSString, TextureSet> = {
         let cache = NSCache<NSString, TextureSet>()
-        // Keep the six idle colors plus a handful of current action sets, but
-        // allow old motions to be regenerated instead of retaining hundreds
-        // of full-resolution frames for the life of the process.
-        cache.countLimit = 14
-        cache.totalCostLimit = 80 * 1_024 * 1_024
+        // There is one texture set per motion now, rather than one per
+        // motion/color pair. All ten animation sets fit inside this budget.
+        cache.countLimit = BunnyMotion.allCases.count
+        cache.totalCostLimit = 72 * 1_024 * 1_024
         return cache
     }()
 
-    func textures(for motion: BunnyMotion, color: BunnyColor) -> [SKTexture] {
-        let key = "\(motion.rawValue):\(color.rawValue)"
+    func textures(for motion: BunnyMotion) -> [SKTexture] {
+        let key = motion.rawValue
         if let cached = cache.object(forKey: key as NSString) {
             return cached.textures
         }
@@ -59,23 +113,7 @@ private final class BunnyAnimationLibrary {
             let y1 = Int((Double(source.height) * Double(row + 1) / 2.0).rounded())
             let rect = CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
             guard let frame = source.cropping(to: rect) else { return nil }
-
-            let output: CGImage
-            if color == .blue {
-                output = frame
-            } else {
-                let input = CIImage(cgImage: frame)
-                let filter = CIFilter(name: "CIHueAdjust")
-                filter?.setValue(input, forKey: kCIInputImageKey)
-                filter?.setValue(hueAngle(for: color), forKey: kCIInputAngleKey)
-                guard let result = filter?.outputImage,
-                      let shifted = context.createCGImage(result, from: input.extent) else {
-                    return nil
-                }
-                output = shifted
-            }
-
-            let texture = SKTexture(cgImage: output)
+            let texture = SKTexture(cgImage: frame)
             texture.filteringMode = .linear
             return texture
         }
@@ -88,15 +126,9 @@ private final class BunnyAnimationLibrary {
         return textures
     }
 
-    private func hueAngle(for color: BunnyColor) -> CGFloat {
-        switch color {
-        case .blue: 0
-        case .green: -1.30
-        case .orange: -2.95
-        case .pink: 2.10
-        case .purple: 1.15
-        case .red: 2.62
-        }
+    func preloadGameplayTextures() {
+        let textures = BunnyMotion.allCases.flatMap { self.textures(for: $0) }
+        SKTexture.preload(textures, withCompletionHandler: {})
     }
 }
 
@@ -104,34 +136,51 @@ private final class BunnyAnimationLibrary {
 /// sprite sheets or a 3D character can replace it without changing game rules.
 @MainActor
 final class BunnyNode: SKNode {
+    static func preloadAnimationTextures() {
+        BunnyAnimationLibrary.shared.preloadGameplayTextures()
+    }
+
     let bunnyID: UUID
 
-    private let bunnyColor: BunnyColor
+    private let visualRoot = SKNode()
     private let bunnyKind: BunnyKind
     private var sprite: SKSpriteNode?
     private weak var specialBadge: SKNode?
     private let cellWidth: CGFloat
     private let cellHeight: CGFloat
     private let animationSeed: Int
+    private var presentationScale: CGFloat
     private var spriteDisplaySize = CGSize.zero
     private var isAiming = false
     private var isDancing = false
     private var isPerformingOneShot = false
 
-    init(bunny: Bunny, cellWidth: CGFloat, cellHeight: CGFloat, color: SKColor) {
+    init(
+        bunny: Bunny,
+        cellWidth: CGFloat,
+        cellHeight: CGFloat,
+        color: SKColor,
+        presentationScale: CGFloat = 1
+    ) {
         bunnyID = bunny.id
-        bunnyColor = bunny.color
         bunnyKind = bunny.kind
         self.cellWidth = cellWidth
         self.cellHeight = cellHeight
+        self.presentationScale = presentationScale
         animationSeed = bunny.id.uuidString.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         super.init()
         name = "bunny:\(bunny.id.uuidString)"
+        // Grow the artwork upward from a stable ground contact instead of
+        // scaling around its center. The outer BunnyNode remains at scale 1,
+        // so aim, entrance, chain, and dance actions stay relative and cannot
+        // erase the row's permanent perspective scale.
+        applyPresentationScale(presentationScale)
+        addChild(visualRoot)
 
         let bodyWidth = cellWidth * 0.66
         let bodyHeight = cellHeight * 0.63
 
-        let idleTextures = BunnyAnimationLibrary.shared.textures(for: .idle, color: bunny.color)
+        let idleTextures = BunnyAnimationLibrary.shared.textures(for: .idle)
         if let firstTexture = idleTextures.first {
             let displaySize = CGSize(
                 width: cellWidth * (1.05 + CGFloat(animationSeed % 3) * 0.025),
@@ -141,10 +190,12 @@ final class BunnyNode: SKNode {
                 texture: firstTexture,
                 size: displaySize
             )
+            sprite.name = "artwork"
             spriteDisplaySize = displaySize
             sprite.position.y = cellHeight * 0.04
             sprite.zPosition = 0
-            addChild(sprite)
+            sprite.shader = BunnyHueShaderLibrary.shader(for: bunny.color)
+            visualRoot.addChild(sprite)
             self.sprite = sprite
             playIdle()
         } else {
@@ -174,9 +225,29 @@ final class BunnyNode: SKNode {
         sprite.size = spriteDisplaySize
     }
 
+    /// Changes the row-perspective scale around the bunny's feet. Keeping this
+    /// animation on the artwork root leaves the outer node free for travel and
+    /// one-shot emphasis, so a chain can no longer briefly reset a bunny to a
+    /// different size before it settles into the next row.
+    func setPresentationScale(_ scale: CGFloat, duration: TimeInterval = 0) {
+        presentationScale = scale
+        visualRoot.removeAction(forKey: "presentationScale")
+        let groundOffset = (scale - 1) * cellHeight * 0.485
+        guard duration > 0 else {
+            applyPresentationScale(scale)
+            return
+        }
+
+        let resize = SKAction.scale(to: scale, duration: duration)
+        resize.timingMode = .easeInEaseOut
+        let anchor = SKAction.moveTo(y: groundOffset, duration: duration)
+        anchor.timingMode = .easeInEaseOut
+        visualRoot.run(.group([resize, anchor]), withKey: "presentationScale")
+    }
+
     func playCelebration(chainDepth: Int) {
         isPerformingOneShot = true
-        let speed = max(0.042, 0.068 - Double(chainDepth - 1) * 0.008)
+        let speed = max(0.075, 0.087 - Double(chainDepth - 1) * 0.006)
         guard play(.celebration, timePerFrame: speed, repeats: false) else {
             run(.sequence([
                 .scaleY(to: 0.84, duration: 0.08),
@@ -198,7 +269,7 @@ final class BunnyNode: SKNode {
 
     func playAdvanceReaction() {
         isPerformingOneShot = true
-        guard play(.advance, timePerFrame: 0.07, repeats: false) else {
+        guard play(.advance, timePerFrame: 0.085, repeats: false) else {
             run(.sequence([
                 .scaleY(to: 0.82, duration: 0.14),
                 .scaleY(to: 1, duration: 0.18)
@@ -237,7 +308,8 @@ final class BunnyNode: SKNode {
         _ = play(.rescue, timePerFrame: 0.07, repeats: false)
     }
 
-    func setDancing(_ dancing: Bool) {
+    func setDancing(_ dancing: Bool, forceRestart: Bool = false) {
+        guard forceRestart || dancing != isDancing else { return }
         isDancing = dancing
         removeAction(forKey: "fallbackDance")
         zRotation = 0
@@ -275,19 +347,19 @@ final class BunnyNode: SKNode {
 
     private func playIdle() {
         guard let sprite else { return }
-        let textures = BunnyAnimationLibrary.shared.textures(for: .idle, color: bunnyColor)
+        let textures = BunnyAnimationLibrary.shared.textures(for: .idle)
         guard !textures.isEmpty else { return }
 
         sprite.removeAction(forKey: "textureAnimation")
         // Boogie Bunnies held readable poses between short gestures. Divide the
-        // crowd into five stable cohorts so only about one fifth is moving at
+        // crowd into seven stable cohorts so only a small portion is moving at
         // once, then return every bunny to the neutral first frame.
-        let idleSpeed = [0.125, 0.132, 0.138][animationSeed % 3]
+        let idleSpeed = [0.155, 0.163, 0.171][animationSeed % 3]
         let gestureDuration = idleSpeed * Double(textures.count)
-        let cohortSlot: TimeInterval = 1.15
-        let cycleDuration = cohortSlot * 5
-        let cohort = animationSeed % 5
-        let personalityOffset = Double((animationSeed / 5) % 4) * 0.035
+        let cohortSlot: TimeInterval = 1.10
+        let cycleDuration = cohortSlot * 7
+        let cohort = animationSeed % 7
+        let personalityOffset = Double((animationSeed / 7) % 4) * 0.035
         let initialDelay = Double(cohort) * cohortSlot + personalityOffset
         let restDuration = max(0.2, cycleDuration - gestureDuration)
         let gesture = fixedSizeAnimation(
@@ -314,7 +386,7 @@ final class BunnyNode: SKNode {
         initialDelay: TimeInterval = 0
     ) -> Bool {
         guard let sprite else { return false }
-        let textures = BunnyAnimationLibrary.shared.textures(for: motion, color: bunnyColor)
+        let textures = BunnyAnimationLibrary.shared.textures(for: motion)
         guard !textures.isEmpty else { return false }
 
         sprite.removeAction(forKey: "textureAnimation")
@@ -373,12 +445,17 @@ final class BunnyNode: SKNode {
 
     private func resumeAmbientMotion() {
         if isDancing {
-            setDancing(true)
+            setDancing(true, forceRestart: true)
         } else if isAiming {
             _ = play(.aim, timePerFrame: 0.135, repeats: true)
         } else {
             playIdle()
         }
+    }
+
+    private func applyPresentationScale(_ scale: CGFloat) {
+        visualRoot.setScale(scale)
+        visualRoot.position.y = (scale - 1) * cellHeight * 0.485
     }
 
     private func addPlaceholder(color: SKColor, bodyWidth: CGFloat, bodyHeight: CGFloat) {
@@ -387,7 +464,7 @@ final class BunnyNode: SKNode {
         body.fillColor = color
         body.strokeColor = .white.withAlphaComponent(0.72)
         body.lineWidth = 1.4
-        addChild(body)
+        visualRoot.addChild(body)
 
         let earSize = CGSize(width: bodyWidth * 0.27, height: cellHeight * 0.34)
         for direction: CGFloat in [-1, 1] {
@@ -398,7 +475,7 @@ final class BunnyNode: SKNode {
             ear.strokeColor = .white.withAlphaComponent(0.72)
             ear.lineWidth = 1.2
             ear.zPosition = -1
-            addChild(ear)
+            visualRoot.addChild(ear)
         }
 
         let eyeRadius = max(1.2, cellWidth * 0.045)
@@ -408,7 +485,7 @@ final class BunnyNode: SKNode {
             eye.fillColor = SKColor(white: 0.08, alpha: 0.9)
             eye.strokeColor = .clear
             eye.zPosition = 2
-            addChild(eye)
+            visualRoot.addChild(eye)
         }
     }
 
@@ -421,7 +498,7 @@ final class BunnyNode: SKNode {
         badge.strokeColor = .white
         badge.lineWidth = 1.2
         badge.zPosition = 3
-        addChild(badge)
+        visualRoot.addChild(badge)
         specialBadge = badge
 
         let symbol = SKLabelNode(fontNamed: "AvenirNext-Heavy")
@@ -446,7 +523,7 @@ final class BunnyNode: SKNode {
             fuse.lineWidth = 2
             fuse.lineCap = .round
             fuse.zPosition = 4
-            addChild(fuse)
+            visualRoot.addChild(fuse)
         }
     }
 

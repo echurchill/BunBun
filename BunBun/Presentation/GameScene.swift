@@ -98,6 +98,22 @@ final class GameScene: SKScene {
         return isTabletLayout ? 1.22 : 1
     }
 
+    private var perspectiveProfile: BoardProjection.Profile {
+        if isTelevisionLayout { return .television }
+        return isTabletLayout ? .tablet : .phone
+    }
+
+    private var boardProjection: BoardProjection {
+        BoardProjection(
+            boardOrigin: boardOrigin,
+            cellWidth: cellWidth,
+            cellHeight: cellHeight,
+            rowCount: state.board.rowCount,
+            columnCount: state.board.columnCount,
+            profile: perspectiveProfile
+        )
+    }
+
     init(
         size: CGSize,
         level: LevelDefinition = LevelCatalog.bunnyLab,
@@ -150,6 +166,10 @@ final class GameScene: SKScene {
         highlightedLane = min(5, state.board.rowCount - 1)
 #endif
         renderAll()
+        // The cleaned sheets are inexpensive to split, and asking SpriteKit to
+        // upload them now prevents the first cascade or dance party from
+        // compiling/uploading several animation sets during a live transition.
+        BunnyNode.preloadAnimationTextures()
         audio.startMusic()
         updateAudioMix()
     }
@@ -265,18 +285,25 @@ final class GameScene: SKScene {
     ) {
         let start = projectileStartPosition(for: side, lane: lane)
         let end: CGPoint
+        let destinationScale: CGFloat
 
         switch result {
         case let .placed(cell):
             audio.play(.launch)
             end = point(for: cell)
+            destinationScale = boardProjection.bunnyScale(for: cell.row)
         case .passedThrough:
             audio.play(.launch)
             let rowY = point(for: Cell(column: 0, row: lane)).y
+            let bounds = boardProjection.rowBounds(for: lane)
+            let localCellWidth = cellWidth * boardProjection.rowWidthScale(for: lane)
             end = CGPoint(
-                x: side == .left ? boardOrigin.x + boardWidth + cellWidth : boardOrigin.x - cellWidth,
+                x: side == .left
+                    ? bounds.upperBound + localCellWidth
+                    : bounds.lowerBound - localCellWidth,
                 y: rowY
             )
+            destinationScale = boardProjection.bunnyScale(for: lane)
         case .blocked:
             audio.play(.blocked)
             flashMessage("BLOCKED", color: .systemOrange)
@@ -301,7 +328,7 @@ final class GameScene: SKScene {
         let move = SKAction.move(to: end, duration: duration)
         move.timingMode = .easeInEaseOut
         projectile.run(.sequence([
-            .group([move, .scale(to: 1, duration: duration)]),
+            .group([move, .scale(to: destinationScale, duration: duration)]),
             .run {
 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -318,7 +345,7 @@ final class GameScene: SKScene {
                 self?.animateAdvanceIfNeeded(outcome)
             }
         } else {
-            updateBunnies(outcome.boardAfterResolution)
+            reconcileBunnies(with: outcome.boardAfterResolution)
             animateAdvanceIfNeeded(outcome)
         }
     }
@@ -334,7 +361,7 @@ final class GameScene: SKScene {
         }
 
         let stage = stages[index]
-        updateBunnies(stage.boardBefore)
+        reconcileBunnies(with: stage.boardBefore)
         let specialKinds = Set(stage.specialActivations.map(\.kind))
         audio.play(stage.depth == 1 ? .match : .chain, emphasis: stage.depth - 1)
         let message: String
@@ -413,7 +440,7 @@ final class GameScene: SKScene {
 
         flashMessage("HOP!", color: .systemPink)
         audio.play(.hop)
-        updateBunnies(outcome.boardAfterResolution)
+        reconcileBunnies(with: outcome.boardAfterResolution)
         for (cell, model) in outcome.boardAfterResolution.occupants {
             guard let bunny = bunnyLayer.childNode(
                 withName: "bunny:\(model.id.uuidString)"
@@ -456,7 +483,7 @@ final class GameScene: SKScene {
     }
 
     private func finishAnimation() {
-        updateBunnies(state.board)
+        reconcileBunnies(with: state.board)
         drawStream()
 #if os(tvOS)
         highlightedLane = min(highlightedLane ?? 0, maximumTelevisionLane)
@@ -476,17 +503,19 @@ final class GameScene: SKScene {
         rescuesMissingBunnies: Bool = false,
         animatesEntrants: Bool = false
     ) {
-        updateBunnies(oldBoard)
         let newLocations = Dictionary(uniqueKeysWithValues: newBoard.occupants.map { ($0.value.id, $0.key) })
 
         for (cell, bunny) in oldBoard.occupants {
-            guard let node = bunnyLayer.childNode(withName: "bunny:\(bunny.id.uuidString)") else { continue }
+            guard let node = bunnyLayer.childNode(withName: "bunny:\(bunny.id.uuidString)") as? BunnyNode else { continue }
             if let newCell = newLocations[bunny.id] {
-                let action = SKAction.move(to: point(for: newCell), duration: duration)
-                action.timingMode = .easeInEaseOut
-                node.run(action)
-            } else if rescuesMissingBunnies, let bunnyNode = node as? BunnyNode {
-                animateTubeRescue(bunnyNode, from: cell)
+                let move = SKAction.move(to: point(for: newCell), duration: duration)
+                move.timingMode = .easeInEaseOut
+                let newScale = boardProjection.bunnyScale(for: newCell.row)
+                node.zPosition = boardProjection.depthPosition(for: newCell.row)
+                node.run(move, withKey: "boardTransition")
+                node.setPresentationScale(newScale, duration: duration)
+            } else if rescuesMissingBunnies {
+                animateTubeRescue(node, from: cell)
             } else {
                 node.run(.group([
                     .moveBy(x: 0, y: -cellHeight * 1.2, duration: duration),
@@ -499,7 +528,7 @@ final class GameScene: SKScene {
         run(.sequence([
             .wait(forDuration: refreshDelay),
             .run { [weak self] in
-                self?.updateBunnies(newBoard, animateEntrants: animatesEntrants)
+                self?.reconcileBunnies(with: newBoard, animateEntrants: animatesEntrants)
             }
         ]))
     }
@@ -681,8 +710,8 @@ final class GameScene: SKScene {
             maximumCellWidth = 76
             boardHeightFraction = 0.54
         } else if isTabletLayout {
-            horizontalPadding = max(54, size.width * 0.08)
-            maximumCellWidth = 64
+            horizontalPadding = max(42, size.width * 0.06)
+            maximumCellWidth = 90
             boardHeightFraction = 0.60
         } else {
             horizontalPadding = 10
@@ -740,6 +769,7 @@ final class GameScene: SKScene {
                     : CGSize(width: cellWidth * 0.62, height: max(4, cellHeight * 0.15))
                 let slot = SKShapeNode(rectOf: slotSize, cornerRadius: slotSize.height / 2)
                 slot.position = point(for: cell)
+                slot.xScale = boardProjection.rowWidthScale(for: row)
                 if !isOutside {
                     slot.position.y -= cellHeight * 0.27
                 }
@@ -951,26 +981,75 @@ final class GameScene: SKScene {
 
     private func updateBunnies(_ board: Board, animateEntrants: Bool = false) {
         bunnyLayer.removeAllChildren()
-        for (cell, bunny) in board.occupants {
-            let node = BunnyNode(
-                bunny: bunny,
-                cellWidth: cellWidth,
-                cellHeight: cellHeight,
-                color: spriteColor(for: bunny.color)
-            )
-            node.position = point(for: cell)
-            node.zPosition = 2
-            node.setDancing(showsDanceParty)
-            if animateEntrants && cell.row == board.rowCount - 1 {
-                node.alpha = 0
-                node.setScale(0.45)
-                node.run(.group([
-                    .fadeIn(withDuration: 0.18),
-                    .scale(to: 1, duration: 0.22)
-                ]))
-            }
-            bunnyLayer.addChild(node)
+        let occupants = board.occupants.sorted { lhs, rhs in
+            if lhs.key.row != rhs.key.row { return lhs.key.row > rhs.key.row }
+            return lhs.key.column < rhs.key.column
         }
+        for (cell, bunny) in occupants {
+            addBunnyNode(bunny, at: cell, on: board, animateEntrant: animateEntrants)
+        }
+    }
+
+    /// Brings the presentation into agreement with a rules board while keeping
+    /// surviving BunnyNodes alive. Rebuilding the entire crowd at every chain
+    /// stage restarted sprite sheets and briefly restored pre-collapse poses,
+    /// which read as a backward jump on high-refresh-rate devices.
+    private func reconcileBunnies(with board: Board, animateEntrants: Bool = false) {
+        let targetLocations = Dictionary(
+            uniqueKeysWithValues: board.occupants.map { ($0.value.id, ($0.key, $0.value)) }
+        )
+        let existingNodes = bunnyLayer.children.compactMap { $0 as? BunnyNode }
+        let existingIDs = Set(existingNodes.map(\.bunnyID))
+
+        for node in existingNodes {
+            guard let (cell, _) = targetLocations[node.bunnyID] else {
+                node.removeFromParent()
+                continue
+            }
+
+            node.removeAction(forKey: "boardTransition")
+            node.position = point(for: cell)
+            node.alpha = 1
+            node.setScale(1)
+            node.setPresentationScale(boardProjection.bunnyScale(for: cell.row))
+            node.zPosition = boardProjection.depthPosition(for: cell.row)
+            node.setDancing(showsDanceParty)
+        }
+
+        let occupants = board.occupants.sorted { lhs, rhs in
+            if lhs.key.row != rhs.key.row { return lhs.key.row > rhs.key.row }
+            return lhs.key.column < rhs.key.column
+        }
+        for (cell, bunny) in occupants where !existingIDs.contains(bunny.id) {
+            addBunnyNode(bunny, at: cell, on: board, animateEntrant: animateEntrants)
+        }
+    }
+
+    private func addBunnyNode(
+        _ bunny: Bunny,
+        at cell: Cell,
+        on board: Board,
+        animateEntrant: Bool
+    ) {
+        let node = BunnyNode(
+            bunny: bunny,
+            cellWidth: cellWidth,
+            cellHeight: cellHeight,
+            color: spriteColor(for: bunny.color),
+            presentationScale: boardProjection.bunnyScale(for: cell.row)
+        )
+        node.position = point(for: cell)
+        node.zPosition = boardProjection.depthPosition(for: cell.row)
+        node.setDancing(showsDanceParty)
+        if animateEntrant && cell.row == board.rowCount - 1 {
+            node.alpha = 0
+            node.setScale(0.45)
+            node.run(.group([
+                .fadeIn(withDuration: 0.18),
+                .scale(to: 1, duration: 0.22)
+            ]))
+        }
+        bunnyLayer.addChild(node)
     }
 
     // MARK: - HUD
@@ -1053,17 +1132,19 @@ final class GameScene: SKScene {
     private func projectileStartPosition(for side: LaunchSide, lane: Int) -> CGPoint {
         switch side {
         case .left:
-            CGPoint(
-                x: boardOrigin.x - cellWidth * 0.72,
+            let bounds = boardProjection.rowBounds(for: lane)
+            return CGPoint(
+                x: bounds.lowerBound - cellWidth * boardProjection.rowWidthScale(for: lane) * 0.72,
                 y: point(for: Cell(column: 0, row: lane)).y
             )
         case .right:
-            CGPoint(
-                x: boardOrigin.x + boardWidth + cellWidth * 0.72,
+            let bounds = boardProjection.rowBounds(for: lane)
+            return CGPoint(
+                x: bounds.upperBound + cellWidth * boardProjection.rowWidthScale(for: lane) * 0.72,
                 y: point(for: Cell(column: state.board.columnCount - 1, row: lane)).y
             )
         case .bottom:
-            CGPoint(
+            return CGPoint(
                 x: point(for: Cell(column: lane, row: 0)).x,
                 y: boardOrigin.y - cellHeight * 0.72
             )
@@ -1091,7 +1172,9 @@ final class GameScene: SKScene {
                 cellHeight: cellHeight,
                 boardWidth: boardWidth,
                 rowCount: state.board.rowCount,
-                columnCount: state.board.columnCount
+                columnCount: state.board.columnCount,
+                rowCenters: boardProjection.rowCenters,
+                rowWidthScales: boardProjection.rowWidthScales
             )
         )
     }
@@ -1142,7 +1225,9 @@ final class GameScene: SKScene {
             let move = SKAction.move(to: destination, duration: 0.13)
             move.timingMode = .easeOut
             let scale = SKAction.scale(to: isDestination ? 1.07 : 1, duration: 0.13)
-            node.zPosition = isDestination ? 12 : 2
+            node.zPosition = isDestination
+                ? 12
+                : boardProjection.depthPosition(for: cell.row)
             node.run(.group([move, scale]), withKey: "aimPull")
         }
     }
@@ -1220,10 +1305,7 @@ final class GameScene: SKScene {
     }
 
     private func point(for cell: Cell) -> CGPoint {
-        CGPoint(
-            x: boardOrigin.x + (CGFloat(cell.column) + 0.5) * cellWidth,
-            y: boardOrigin.y + (CGFloat(cell.row) + 0.5) * cellHeight
-        )
+        boardProjection.point(for: cell)
     }
 
     private func controlName(at point: CGPoint) -> String? {
@@ -1295,22 +1377,38 @@ final class GameScene: SKScene {
 
         case .lineClear:
             let center = point(for: activation.cell)
+            let rowBounds = boardProjection.rowBounds(for: activation.cell.row)
             let horizontal = SKShapeNode(
-                rectOf: CGSize(width: boardWidth + cellWidth, height: max(7, cellHeight * 0.22)),
+                rectOf: CGSize(
+                    width: rowBounds.upperBound - rowBounds.lowerBound + cellWidth,
+                    height: max(7, cellHeight * 0.22)
+                ),
                 cornerRadius: 4
             )
             horizontal.position = CGPoint(x: boardOrigin.x + boardWidth / 2, y: center.y)
 
-            let vertical = SKShapeNode(
-                rectOf: CGSize(width: max(7, cellWidth * 0.22), height: boardHeight + cellHeight),
-                cornerRadius: 4
-            )
-            vertical.position = CGPoint(x: center.x, y: boardOrigin.y + boardHeight / 2)
+            let verticalPath = CGMutablePath()
+            let frontPoint = point(for: Cell(column: activation.cell.column, row: 0))
+            verticalPath.move(to: CGPoint(x: frontPoint.x - center.x, y: frontPoint.y - center.y))
+            for row in 1..<state.board.rowCount {
+                let rowPoint = point(for: Cell(column: activation.cell.column, row: row))
+                verticalPath.addLine(to: CGPoint(x: rowPoint.x - center.x, y: rowPoint.y - center.y))
+            }
+            let vertical = SKShapeNode(path: verticalPath)
+            vertical.position = center
+            vertical.strokeColor = .systemPurple.withAlphaComponent(0.64)
+            vertical.lineWidth = max(7, cellWidth * 0.22)
+            vertical.lineCap = .round
+            vertical.glowWidth = 2
 
             for beam in [horizontal, vertical] {
-                beam.fillColor = .systemPurple.withAlphaComponent(0.64)
-                beam.strokeColor = .white
-                beam.lineWidth = 2
+                if beam === horizontal {
+                    beam.fillColor = .systemPurple.withAlphaComponent(0.64)
+                    beam.strokeColor = .white
+                    beam.lineWidth = 2
+                } else {
+                    beam.strokeColor = .systemPurple.withAlphaComponent(0.82)
+                }
                 beam.zPosition = 29
                 beam.setScale(0.08)
                 effectLayer.addChild(beam)
@@ -1364,7 +1462,7 @@ final class GameScene: SKScene {
             showsDanceParty = true
             renderEnvironmentEffects(danceMode: true)
             configureDancePartyBackdrop()
-            updateBunnies(outcome.boardAfterResolution)
+            reconcileBunnies(with: outcome.boardAfterResolution)
             flashMessage("DANCE PARTY!  2×", color: .systemYellow)
             addConfetti(for: 3)
         } else if outcome.dancePartyEnded {
@@ -1456,20 +1554,24 @@ final class GameScene: SKScene {
 
     private func pulseLaunchTarget(side: LaunchSide, lane: Int) {
         let position: CGPoint
+        let rowScale: CGFloat
         switch side {
         case .left:
             position = point(for: Cell(column: 0, row: lane))
+            rowScale = boardProjection.rowWidthScale(for: lane)
         case .right:
             position = point(for: Cell(column: state.board.columnCount - 1, row: lane))
+            rowScale = boardProjection.rowWidthScale(for: lane)
         case .bottom:
             position = CGPoint(
                 x: point(for: Cell(column: lane, row: 0)).x,
                 y: boardOrigin.y - cellHeight * 0.48
             )
+            rowScale = 1
         }
 
         let pulse = SKShapeNode(
-            rectOf: CGSize(width: cellWidth - 2, height: cellHeight - 2),
+            rectOf: CGSize(width: (cellWidth - 2) * rowScale, height: cellHeight - 2),
             cornerRadius: 5
         )
         pulse.position = position

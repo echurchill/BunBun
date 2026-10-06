@@ -3,6 +3,51 @@ import SpriteKit
 @testable import BunBun
 
 final class BoardAndTurnTests: XCTestCase {
+    @MainActor
+    func testPreloadedCrowdCanEnterDanceWithoutBlockingTheFrame() {
+        BunnyNode.preloadAnimationTextures()
+        let nodes = (0..<60).map { index in
+            let color = BunnyColor.allCases[index % BunnyColor.allCases.count]
+            return BunnyNode(
+                bunny: Bunny(color: color),
+                cellWidth: 31,
+                cellHeight: 45.5,
+                color: .systemBlue
+            )
+        }
+
+        let duration = ContinuousClock().measure {
+            for node in nodes {
+                node.setDancing(true)
+            }
+        }
+
+        // This transition formerly performed sprite cleanup and Core Image
+        // hue shifts here, taking several seconds on handheld hardware.
+        XCTAssertLessThan(duration, .milliseconds(16))
+    }
+
+    @MainActor
+    func testColoredBunniesUseSharedTextureHueShader() throws {
+        let blue = BunnyNode(
+            bunny: Bunny(color: .blue),
+            cellWidth: 31,
+            cellHeight: 45.5,
+            color: .systemBlue
+        )
+        let green = BunnyNode(
+            bunny: Bunny(color: .green),
+            cellWidth: 31,
+            cellHeight: 45.5,
+            color: .systemGreen
+        )
+
+        let blueSprite = try XCTUnwrap(blue.childNode(withName: "//artwork") as? SKSpriteNode)
+        let greenSprite = try XCTUnwrap(green.childNode(withName: "//artwork") as? SKSpriteNode)
+        XCTAssertNil(blueSprite.shader)
+        XCTAssertNotNil(greenSprite.shader)
+    }
+
     func testSideLaunchPassesThroughEmptyRow() {
         var board = Board()
         let result = board.launch(Bunny(color: .blue), from: .left, lane: 4)
@@ -103,7 +148,7 @@ final class BoardAndTurnTests: XCTestCase {
 
         // Also prove that the final render-pass guard repairs any native-size
         // frame left behind by an interrupted SpriteKit texture action.
-        let sprite = try XCTUnwrap(node.children.compactMap { $0 as? SKSpriteNode }.first)
+        let sprite = try XCTUnwrap(node.childNode(withName: "//artwork") as? SKSpriteNode)
         sprite.size = CGSize(width: 2_048, height: 2_048)
         node.enforceDisplaySize()
 
@@ -114,4 +159,5 @@ final class BoardAndTurnTests: XCTestCase {
             XCTAssertLessThanOrEqual(renderedBounds.height, cellHeight * 1.2)
         }
     }
+
 }

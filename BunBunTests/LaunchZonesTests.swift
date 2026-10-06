@@ -121,4 +121,63 @@ final class LaunchZonesTests: XCTestCase {
             .right
         )
     }
+
+    func testPerspectiveProjectionCreatesDenserForegroundCrowd() {
+        let projection = BoardProjection(
+            boardOrigin: wideLayout.boardOrigin,
+            cellWidth: wideLayout.cellWidth,
+            cellHeight: wideLayout.cellHeight,
+            rowCount: wideLayout.rowCount,
+            columnCount: wideLayout.columnCount,
+            profile: .phone
+        )
+
+        XCTAssertGreaterThan(projection.bunnyScale(for: 0), projection.bunnyScale(for: 7))
+        XCTAssertGreaterThan(projection.rowWidthScale(for: 0), projection.rowWidthScale(for: 7))
+
+        let frontSpacing = projection.point(for: Cell(column: 5, row: 1)).y
+            - projection.point(for: Cell(column: 5, row: 0)).y
+        let backSpacing = projection.point(for: Cell(column: 5, row: 7)).y
+            - projection.point(for: Cell(column: 5, row: 6)).y
+        XCTAssertGreaterThan(frontSpacing, backSpacing)
+        XCTAssertGreaterThan(
+            projection.depthPosition(for: 0),
+            projection.depthPosition(for: 7)
+        )
+    }
+
+    func testPerspectiveSideZonesFollowProjectedRowCentersAndWidths() {
+        let projection = BoardProjection(
+            boardOrigin: wideLayout.boardOrigin,
+            cellWidth: wideLayout.cellWidth,
+            cellHeight: wideLayout.cellHeight,
+            rowCount: wideLayout.rowCount,
+            columnCount: wideLayout.columnCount,
+            profile: .phone
+        )
+        let layout = LaunchZones.Layout(
+            size: wideLayout.size,
+            boardOrigin: wideLayout.boardOrigin,
+            cellWidth: wideLayout.cellWidth,
+            cellHeight: wideLayout.cellHeight,
+            boardWidth: wideLayout.boardWidth,
+            rowCount: wideLayout.rowCount,
+            columnCount: wideLayout.columnCount,
+            rowCenters: projection.rowCenters,
+            rowWidthScales: projection.rowWidthScales
+        )
+
+        for row in 0..<wideLayout.rowCount {
+            let leftOutline = projection.point(for: Cell(column: 0, row: row))
+            let rightOutline = projection.point(for: Cell(column: 11, row: row))
+            XCTAssertEqual(
+                LaunchZones.target(at: leftOutline, layout: layout),
+                LaunchZones.Target(side: .left, lane: row)
+            )
+            XCTAssertEqual(
+                LaunchZones.target(at: rightOutline, layout: layout),
+                LaunchZones.Target(side: .right, lane: row)
+            )
+        }
+    }
 }

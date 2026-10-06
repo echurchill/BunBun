@@ -103,12 +103,12 @@ The 12-column structure is reconstructed; the eight-row depth is a provisional t
 
 ### Collapse
 
-- After a clear, each column compacts toward row 7, the back/arrival edge, while preserving bunny order. A successful match therefore creates breathing room near the hazard.
+- After a clear, only columns containing removed bunnies compact toward row 7, the back/arrival edge, while preserving bunny order. A successful match therefore creates breathing room near the hazard without pulling unrelated columns backward into old arrival gaps.
 - The initial clear must contain the newly placed bunny.
 - After the first clear, every new 3+ group caused by compaction may resolve as the next chain stage.
 - Advancement itself never starts match resolution.
 
-Prototype 0.4 initially packed cleared columns toward row 0. Physical-device playtesting immediately exposed that as backwards: a successful match made the entire formation rush toward danger. From the September 25 playtest onward, successful clears compact away from the hazard; scheduled Classic advancement remains the only whole-formation movement toward it. This behavior is isolated in `Board.compactAwayFromHazard()` so later historical verification can still refine it without rewriting matching or presentation.
+Prototype 0.4 initially packed cleared columns toward row 0. Physical-device playtesting immediately exposed that as backwards: a successful match made the entire formation rush toward danger. From the September 25 playtest onward, successful clears compact away from the hazard; scheduled Classic advancement remains the only whole-formation movement toward it. An October 4 playtest further established that compaction is local to columns touched by a clear rather than a repack of the whole board. This behavior is isolated in `Board.compactAwayFromHazard(in:)` so later historical verification can still refine it without rewriting matching or presentation.
 
 ### Prototype scoring
 
