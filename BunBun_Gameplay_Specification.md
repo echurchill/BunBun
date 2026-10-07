@@ -1,7 +1,7 @@
 # BunBun Gameplay Specification
 
 **Prototype:** 0.5 — Levels and Campaign Foundation
-**Platform:** iPhone and iPad
+**Platform:** iPhone, iPad, and Apple TV
 **Technology:** Swift + SpriteKit  
 **Gift date:** December 23, 2026  
 **Project name:** BunBun (working title)
@@ -60,6 +60,7 @@ This document keeps three categories separate:
 - Filling it triggers a dance party.
 - Matches during a dance party receive a 2× score multiplier.
 - Dance parties are part of the game's identity and eventual reward loop, not merely a decorative animation.
+- Gameplay footage shows a prominent running score and short praise callouts when matches resolve.
 
 ### Special bunnies
 
@@ -77,6 +78,8 @@ Sources:
 
 - The original offered Classic, Arcade, and Endless modes.
 - The original campaign moved through themed locations and costume sets.
+- Available playthrough footage shows new formations arriving within the play scene when a stage is completed rather than sending the player through the BunBun 0.5-style result panel after every board.
+- Incoming colors appear varied rather than following a short, visibly repeating fixed sequence. The exact original randomizer is not known.
 - The game supported cooperative play, although its shared-rail movement had control limitations.
 - The original did not reveal the next bunny color.
 
@@ -113,6 +116,8 @@ Prototype 0.4 initially packed cleared columns toward row 0. Physical-device pla
 ### Prototype scoring
 
 - 100 points per removed bunny, multiplied by the one-based chain stage.
+- Each chain stage emits its own pure-Swift `ScoreEvent`, including the removed count, special activations, multiplier, points, and a GOOD/GREAT/AWESOME/FANTASTIC presentation cue.
+- The HUD displays the score as a persistent seven-digit counter. A stage-local callout appears over the resolved group while the campaign total continues across stage transitions.
 - Progress, dance, danger, win/loss, bombs, and line clears are active in Prototype 0.4. Their exact values are provisional BunBun tuning rather than reconstructed historical constants.
 
 ## 3. Proposed BunBun changes
@@ -295,7 +300,7 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 
 ### Data-driven levels
 
-- `LevelDefinition` owns the starting layout, supplied shots, deterministic arrival pattern, tutorial prompts, theme identifier, and gameplay tuning.
+- `LevelDefinition` owns the starting layout, authored tutorial/special shots, deterministic arrival pattern, tutorial prompts, environment identifier, and gameplay tuning.
 - `GameState` consumes a level's `GameRules`; matching, chaining, board geometry, and special behavior remain shared.
 - **Bunny Lab** preserves the Prototype 0.4 opening and forgiving tuning.
 - **Carrot Works** reuses the workshop setting with a new board, shot order, deterministic arrivals, and a modest pressure increase.
@@ -307,7 +312,7 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 
 ### Shared environment presentation
 
-- Six levels are grouped into three two-level environment sets: Desert Camp, Midnight Forest Camp, and Snow Camp.
+- Twelve levels are grouped into four three-level environment sets: Sunset Camp, Springtime Camp, Moonlit Camp, and Winter Camp.
 - The Forest Camp plate is the composition master; desert and snow variants preserve its camera, horizon, quiet center, prop placement, and clear lower hazard band.
 - Square environment plates use aspect-fill cropping so they work on portrait iPhone and portrait or landscape iPad.
 - Background plates contain no water. SpriteKit composites a separate transparent rendered creek at the hazard edge so it remains consistent, readable, and tunable across themes.
@@ -322,11 +327,24 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 ### Campaign and navigation
 
 - Only Bunny Lab is initially unlocked.
-- Winning records completion, preserves the best score, and unlocks exactly the next level.
+- Winning records the completed stage's score, preserves its best score, and unlocks exactly the next level.
+- Campaign play continues in the same SpriteKit scene: the crowd celebrates and clears, a destination card appears, the environment and tuning change, and a fresh authored formation enters. The running score is carried into the next stage.
+- A stage/destination readout in the HUD makes the current location and upcoming environment legible without interrupting play.
+- The end panel appears only after the final campaign stage or on a loss. Endless behavior is unchanged.
 - Campaign state is Codable and saved through a protocol-based persistence boundary backed by `UserDefaults`.
 - Missing or corrupt save data safely returns to a new campaign.
 - The level picker shows locks, completed levels, and best scores, with reset progress behind confirmation.
-- Win flow offers Next Level, Replay, and Levels; loss flow offers Retry and Levels.
+- Final-win flow offers Replay and Levels; loss flow offers Retry and Levels.
+
+### Incoming bunny supply
+
+- The first four Bunny Lab tutorial shots remain authored so the controls and special bunnies are taught reliably.
+- Authored bomb and line-clear positions remain fixed in every level, preserving the intended special-bunny cadence.
+- Ordinary colors use a deterministic, board-aware shuffle bag instead of repeating `shotSequence` in order.
+- Every color in the level palette receives two base tickets. Colors already present receive up to three modest board-count tickets, and colors with an orthogonally adjacent pair receive one more ticket.
+- Each new run chooses a fresh random salt and mixes it with the level seed, so replays receive different sequences. The pure queue accepts an explicit seed, allowing tests and diagnostic harnesses to reproduce an exact sequence.
+- The bag prevents three identical normal colors in a row. Weighting creates tempting near-matches but never guarantees that a useful color arrives.
+- The next-bunny preview is retained as an intentional BunBun accessibility/fairness choice even though the original reportedly hid it.
 
 ### iPhone and iPad presentation
 
@@ -340,7 +358,7 @@ Prototype 0.5 turns the single hard-coded board into a small, replayable campaig
 ### Prototype 0.5 automated coverage
 
 - All previous matching, chain, geometry, pressure, special, and turn tests remain active.
-- New tests verify level validity, match-free starts, level-specific rules, deterministic arrivals, sequential unlocks, loss behavior, best-score replacement, final-level bounds, Codable round-tripping, persistence reset, and corrupt-save recovery.
+- New tests verify level validity, match-free starts, level-specific rules, deterministic arrivals, seeded queue replay, queue color coverage and streak protection, board-pair weighting, score-event creation, campaign destinations, sequential unlocks, loss behavior, best-score replacement, final-level bounds, Codable round-tripping, persistence reset, and corrupt-save recovery.
 
 ## 12. Apple TV feasibility pass
 

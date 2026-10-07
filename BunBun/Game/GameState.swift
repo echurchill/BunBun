@@ -11,6 +11,22 @@ enum GameMode: Equatable, Sendable {
     case endless
 }
 
+enum ScorePraise: String, Equatable, Sendable {
+    case good = "GOOD!"
+    case great = "GREAT!"
+    case awesome = "AWESOME!"
+    case fantastic = "FANTASTIC!"
+}
+
+struct ScoreEvent: Equatable, Sendable {
+    let chainDepth: Int
+    let removedBunnies: Int
+    let specialActivations: Int
+    let multiplier: Int
+    let points: Int
+    let praise: ScorePraise
+}
+
 struct TurnOutcome: Equatable, Sendable {
     let launchResult: LaunchResult
     let chain: ChainResolution?
@@ -19,6 +35,7 @@ struct TurnOutcome: Equatable, Sendable {
     let didAdvance: Bool
     let fallenBunnies: [Bunny]
     let pointsAwarded: Int
+    let scoreEvents: [ScoreEvent]
     let scoreMultiplier: Int
     let progressDelta: Int
     let dangerDelta: Int
@@ -115,6 +132,7 @@ struct GameState: Equatable, Sendable {
                 didAdvance: false,
                 fallenBunnies: [],
                 pointsAwarded: 0,
+                scoreEvents: [],
                 scoreMultiplier: isDancePartyActive ? 2 : 1,
                 progressDelta: 0,
                 dangerDelta: 0,
@@ -130,6 +148,7 @@ struct GameState: Equatable, Sendable {
         let launchResult = board.launch(bunny, from: side, lane: lane)
         var chain: ChainResolution?
         var points = 0
+        var scoreEvents: [ScoreEvent] = []
         var removedCount = 0
         var matchedCount = 0
         var specialEffectRemovedCount = 0
@@ -142,9 +161,27 @@ struct GameState: Equatable, Sendable {
             removedCount = resolution.removedCount
             matchedCount = resolution.matchedCount
             specialEffectRemovedCount = resolution.specialEffectRemovedCount
-            points = resolution.stages.reduce(0) { partial, stage in
-                partial + stage.removedCells.count * rules.pointsPerRemovedBunny * stage.depth
-            } * multiplier
+            scoreEvents = resolution.stages.map { stage in
+                let stageMultiplier = stage.depth * multiplier
+                let stagePoints = stage.removedCells.count
+                    * rules.pointsPerRemovedBunny
+                    * stageMultiplier
+                let praise: ScorePraise = switch stage.depth {
+                case 1: .good
+                case 2: .great
+                case 3: .awesome
+                default: .fantastic
+                }
+                return ScoreEvent(
+                    chainDepth: stage.depth,
+                    removedBunnies: stage.removedCells.count,
+                    specialActivations: stage.specialActivations.count,
+                    multiplier: stageMultiplier,
+                    points: stagePoints,
+                    praise: praise
+                )
+            }
+            points = scoreEvents.reduce(0) { $0 + $1.points }
             score += points
         }
 
@@ -222,6 +259,7 @@ struct GameState: Equatable, Sendable {
             didAdvance: didAdvance,
             fallenBunnies: fallen,
             pointsAwarded: points,
+            scoreEvents: scoreEvents,
             scoreMultiplier: multiplier,
             progressDelta: progress - startingProgress,
             dangerDelta: danger - startingDanger,

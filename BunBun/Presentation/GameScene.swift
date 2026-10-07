@@ -39,9 +39,8 @@ final class GameScene: SKScene {
         }
     }
 
-    private let level: LevelDefinition
+    private var level: LevelDefinition
     private let mode: GameMode
-    private let hasNextLevel: Bool
     private let onLevelCompleted: (LevelID, Int) -> Void
     private let onRunEnded: (Int) -> Void
     private let onRequestLevels: () -> Void
@@ -50,6 +49,10 @@ final class GameScene: SKScene {
 
     private var state: GameState
     private var currentShotIndex = 0
+    private var queueRunSeed: UInt64
+    private var shotQueue: BunnyQueue
+    private var currentShot: PrototypeShot
+    private var levelStartingScore = 0
     private var selectedSide: LaunchSide = .bottom
     private var highlightedLane: Int?
     private var isAnimating = false
@@ -131,14 +134,27 @@ final class GameScene: SKScene {
         onRequestLevels: @escaping () -> Void = {},
         onRequestNextLevel: @escaping () -> Void = {}
     ) {
+        let openingBoard = level.startingBoard()
+        let openingRunSeed = UInt64.random(in: UInt64.min...UInt64.max)
+        var openingQueue = BunnyQueue(
+            seed: LevelCatalog.queueSeed(for: level.id) ^ openingRunSeed,
+            palette: level.arrivalPalette
+        )
+        let authoredOpeningShot = level.shot(at: 0)
+        let openingShot = level.tutorialPrompts.indices.contains(0)
+            || authoredOpeningShot.kind != .normal
+            ? authoredOpeningShot
+            : openingQueue.next(on: openingBoard)
         self.level = level
         self.mode = mode
-        self.hasNextLevel = hasNextLevel
         self.onLevelCompleted = onLevelCompleted
         self.onRunEnded = onRunEnded
         self.onRequestLevels = onRequestLevels
         self.onRequestNextLevel = onRequestNextLevel
-        state = GameState(board: level.startingBoard(), rules: level.rules, mode: mode)
+        state = GameState(board: openingBoard, rules: level.rules, mode: mode)
+        queueRunSeed = openingRunSeed
+        shotQueue = openingQueue
+        currentShot = openingShot
         super.init(size: size)
     }
 
@@ -269,7 +285,7 @@ final class GameScene: SKScene {
     }
 
     private func performLaunch(lane: Int) {
-        let shot = level.shot(at: currentShotIndex)
+        let shot = currentShot
         let bunny = shot.makeBunny()
         let newRow = level.advanceRow(forTurn: currentShotIndex)
         // The rules resolve the whole turn synchronously, but the scene still
@@ -287,6 +303,7 @@ final class GameScene: SKScene {
         )
         playtestStats.record(outcome)
         currentShotIndex += 1
+        currentShot = makeShot(at: currentShotIndex, on: state.board)
         highlightedLane = nil
         isAnimating = true
         drawGrid()
@@ -300,6 +317,14 @@ final class GameScene: SKScene {
         ) { [weak self] in
             self?.animateResolution(outcome)
         }
+    }
+
+    private func makeShot(at index: Int, on board: Board) -> PrototypeShot {
+        let authoredShot = level.shot(at: index)
+        if level.tutorialPrompts.indices.contains(index) || authoredShot.kind != .normal {
+            return authoredShot
+        }
+        return shotQueue.next(on: board)
     }
 
     // MARK: - Animation
@@ -370,7 +395,7 @@ final class GameScene: SKScene {
 
     private func animateResolution(_ outcome: TurnOutcome) {
         if let stages = outcome.chain?.stages, !stages.isEmpty {
-            animateChain(stages, index: 0) { [weak self] in
+            animateChain(stages, scoreEvents: outcome.scoreEvents, index: 0) { [weak self] in
                 self?.animateAdvanceIfNeeded(outcome)
             }
         } else {
@@ -381,6 +406,7 @@ final class GameScene: SKScene {
 
     private func animateChain(
         _ stages: [ChainStage],
+        scoreEvents: [ScoreEvent],
         index: Int,
         completion: @escaping () -> Void
     ) {
@@ -393,7 +419,7 @@ final class GameScene: SKScene {
         reconcileBunnies(with: stage.boardBefore)
         let specialKinds = Set(stage.specialActivations.map(\.kind))
         audio.play(stage.depth == 1 ? .match : .chain, emphasis: stage.depth - 1)
-        let message: String
+        let message: String?
         if specialKinds.count > 1 {
             message = "SPECIAL CHAIN!"
         } else if specialKinds.contains(.redBomb) {
@@ -401,9 +427,14 @@ final class GameScene: SKScene {
         } else if specialKinds.contains(.lineClear) {
             message = "LINE CLEAR!"
         } else {
-            message = stage.depth == 1 ? "MATCH!" : "CHAIN ×\(stage.depth)"
+            message = nil
         }
-        flashMessage(message, color: .systemYellow)
+        if let message {
+            flashMessage(message, color: .systemYellow)
+        }
+        if scoreEvents.indices.contains(index) {
+            addScoreCallout(scoreEvents[index], cells: stage.matchedCells)
+        }
 #if os(iOS)
         matchFeedback.notificationOccurred(stage.depth == 1 ? .success : .warning)
         matchFeedback.prepare()
@@ -455,7 +486,12 @@ final class GameScene: SKScene {
             },
             .wait(forDuration: 0.25),
             .run { [weak self] in
-                self?.animateChain(stages, index: index + 1, completion: completion)
+                self?.animateChain(
+                    stages,
+                    scoreEvents: scoreEvents,
+                    index: index + 1,
+                    completion: completion
+                )
             }
         ]))
     }
@@ -523,8 +559,151 @@ final class GameScene: SKScene {
 #endif
         drawHUD()
         updateAudioMix()
+        if mode == .classic, state.status == .won,
+           let nextLevel = LevelCatalog.nextLevel(after: level.id) {
+            beginLevelTransition(to: nextLevel)
+            return
+        }
         isAnimating = false
         showEndStateIfNeeded()
+    }
+
+    private func beginLevelTransition(to nextLevel: LevelDefinition) {
+        let completedLevel = level
+        let carriedScore = state.score
+        onLevelCompleted(completedLevel.id, carriedScore - levelStartingScore)
+        audio.play(.win)
+        addConfetti(for: 5)
+        isAnimating = true
+        highlightedLane = nil
+        drawGrid()
+        updateAimReactions()
+
+        for (index, node) in bunnyLayer.children.enumerated() {
+            guard let bunny = node as? BunnyNode else { continue }
+            bunny.setDancing(true)
+            let delay = Double(index % 8) * 0.035
+            bunny.run(.sequence([
+                .wait(forDuration: delay),
+                .group([
+                    .moveBy(x: 0, y: cellHeight * 0.55, duration: 0.42),
+                    .fadeOut(withDuration: 0.42),
+                    .scale(to: 0.72, duration: 0.42)
+                ])
+            ]))
+        }
+
+        let announcement = makeLevelAnnouncement(for: nextLevel)
+        effectLayer.addChild(announcement)
+        announcement.alpha = 0
+        announcement.setScale(0.86)
+        announcement.run(.group([
+            .fadeIn(withDuration: 0.22),
+            .scale(to: 1, duration: 0.22)
+        ]))
+
+        run(.sequence([
+            .wait(forDuration: 0.92),
+            .run { [weak self] in
+                self?.installLevel(nextLevel, carryingScore: carriedScore)
+            },
+            .wait(forDuration: 1.25),
+            .run { [weak self, weak announcement] in
+                announcement?.run(.sequence([
+                    .fadeOut(withDuration: 0.25),
+                    .removeFromParent()
+                ]))
+                self?.flashMessage("LET'S BOOGIE!", color: .systemGreen)
+            },
+            .wait(forDuration: 0.28),
+            .run { [weak self] in
+                self?.isAnimating = false
+            }
+        ]))
+    }
+
+    private func installLevel(_ nextLevel: LevelDefinition, carryingScore: Int) {
+        level = nextLevel
+        let nextBoard = nextLevel.startingBoard()
+        state = GameState(
+            board: nextBoard,
+            rules: nextLevel.rules,
+            mode: mode,
+            score: carryingScore
+        )
+        levelStartingScore = carryingScore
+        currentShotIndex = 0
+        shotQueue = BunnyQueue(
+            seed: LevelCatalog.queueSeed(for: nextLevel.id) ^ queueRunSeed,
+            palette: nextLevel.arrivalPalette
+        )
+        currentShot = makeShot(at: 0, on: nextBoard)
+        showsDanceParty = false
+        partyLayer.removeAllChildren()
+        backgroundColor = themeBackgroundColor
+#if os(tvOS)
+        selectedSide = .left
+        highlightedLane = min(5, nextBoard.rowCount - 1)
+#else
+        selectedSide = .bottom
+        highlightedLane = nil
+#endif
+        bunnyLayer.removeAllChildren()
+        backgroundLayer.alpha = 0
+        renderAll()
+        backgroundLayer.run(.fadeIn(withDuration: 0.42))
+        revealFreshFormation()
+        updateAudioMix()
+    }
+
+    private func revealFreshFormation() {
+        let nodes = bunnyLayer.children.compactMap { $0 as? BunnyNode }
+        for (index, node) in nodes.enumerated() {
+            node.alpha = 0
+            node.setScale(0.64)
+            node.position.y += cellHeight * 0.38
+            let delay = Double(index % 12) * 0.025 + Double(index / 12) * 0.035
+            let settle = SKAction.moveBy(x: 0, y: -cellHeight * 0.38, duration: 0.28)
+            settle.timingMode = .easeOut
+            node.run(.sequence([
+                .wait(forDuration: delay),
+                .group([
+                    .fadeIn(withDuration: 0.20),
+                    .scale(to: 1, duration: 0.26),
+                    settle
+                ])
+            ]))
+        }
+    }
+
+    private func makeLevelAnnouncement(for nextLevel: LevelDefinition) -> SKNode {
+        let container = SKNode()
+        container.name = "level-transition"
+        container.zPosition = 70
+
+        let shade = SKShapeNode(rectOf: size)
+        shade.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        shade.fillColor = SKColor(white: 0.02, alpha: 0.72)
+        shade.strokeColor = .clear
+        container.addChild(shade)
+
+        let position = LevelCatalog.campaignPosition(for: nextLevel.id)
+        let title = SKLabelNode(fontNamed: "AvenirNext-Heavy")
+        title.text = "LEVEL \(position.overallLevel)!"
+        title.fontSize = 34 * min(hudScale, 1.45)
+        title.fontColor = .systemYellow
+        title.verticalAlignmentMode = .center
+        title.position = CGPoint(x: size.width / 2, y: size.height / 2 + 18)
+        container.addChild(title)
+
+        let subtitle = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        subtitle.text = "\(nextLevel.displayName.uppercased())  •  \(position.destinationText)"
+        subtitle.fontSize = 13 * min(hudScale, 1.45)
+        subtitle.fontColor = .white
+        subtitle.verticalAlignmentMode = .center
+        subtitle.position = CGPoint(x: size.width / 2, y: size.height / 2 - 22)
+        container.addChild(subtitle)
+        return container
     }
 
     private func animateBoardTransition(
@@ -1086,7 +1265,8 @@ final class GameScene: SKScene {
     // MARK: - HUD
 
     private func drawHUD() {
-        let shot = level.shot(at: currentShotIndex)
+        let shot = currentShot
+        let campaignPosition = LevelCatalog.campaignPosition(for: level.id)
 #if os(tvOS)
         let televisionStatus: String? = "\(selectedSide.rawValue.uppercased())  •  LANE \((highlightedLane ?? 0) + 1)"
 #else
@@ -1100,6 +1280,9 @@ final class GameScene: SKScene {
             isTelevision: isTelevisionLayout,
             hudScale: hudScale,
             levelName: level.displayName,
+            campaignStatus: mode == .endless
+                ? "ENDLESS STAGE \(state.endlessStage)"
+                : campaignPosition.hudText,
             appVersion: AppVersion.marketingVersion,
             subtitle: mode == .endless
                 ? "Keep matching — pressure rises every 24 hops"
@@ -1548,7 +1731,7 @@ final class GameScene: SKScene {
                 danceParties: playtestStats.danceParties,
                 elapsedSeconds: playtestStats.elapsedSeconds
             ),
-            hasNextLevel: mode == .classic && hasNextLevel,
+            hasNextLevel: mode == .classic && LevelCatalog.nextLevel(after: level.id) != nil,
             size: size,
             boardCenter: CGPoint(x: boardOrigin.x + boardWidth / 2, y: boardOrigin.y + boardHeight / 2),
             isTablet: isTabletLayout,
@@ -1558,7 +1741,7 @@ final class GameScene: SKScene {
             didReportCompletion = true
             onRunEnded(state.score)
             if state.status == .won {
-                onLevelCompleted(level.id, state.score)
+                onLevelCompleted(level.id, state.score - levelStartingScore)
             }
         }
         if state.status == .won {
@@ -1580,6 +1763,43 @@ final class GameScene: SKScene {
             .scale(to: 1, duration: 0.08),
             .wait(forDuration: 0.24),
             .group([.moveBy(x: 0, y: 12, duration: 0.18), .fadeOut(withDuration: 0.18)]),
+            .removeFromParent()
+        ]))
+    }
+
+    private func addScoreCallout(_ event: ScoreEvent, cells: Set<Cell>) {
+        let positions = cells.map(point(for:))
+        let center = positions.isEmpty
+            ? CGPoint(x: size.width / 2, y: boardOrigin.y + boardHeight * 0.60)
+            : CGPoint(
+                x: positions.reduce(0) { $0 + $1.x } / CGFloat(positions.count),
+                y: positions.reduce(0) { $0 + $1.y } / CGFloat(positions.count)
+            )
+        let multiplier = event.multiplier > 1 ? "  ×\(event.multiplier)" : ""
+        let label = SKLabelNode(fontNamed: "AvenirNext-Heavy")
+        label.text = "+\(event.points)  \(event.praise.rawValue)\(multiplier)"
+        label.fontSize = 18 * min(hudScale, 1.35)
+        label.fontColor = switch event.praise {
+        case .good: .systemGreen
+        case .great: .systemCyan
+        case .awesome: .systemPink
+        case .fantastic: .systemYellow
+        }
+        label.position = CGPoint(x: center.x, y: center.y + cellHeight * 0.18)
+        label.zPosition = 45
+        label.setScale(0.65)
+        effectLayer.addChild(label)
+        label.run(.sequence([
+            .group([
+                .scale(to: 1.08, duration: 0.14),
+                .moveBy(x: 0, y: cellHeight * 0.22, duration: 0.14)
+            ]),
+            .scale(to: 1, duration: 0.08),
+            .wait(forDuration: 0.30),
+            .group([
+                .moveBy(x: 0, y: cellHeight * 0.34, duration: 0.22),
+                .fadeOut(withDuration: 0.22)
+            ]),
             .removeFromParent()
         ]))
     }
@@ -1626,6 +1846,13 @@ final class GameScene: SKScene {
         effectLayer.removeAllChildren()
         state = GameState(board: level.startingBoard(), rules: level.rules, mode: mode)
         currentShotIndex = 0
+        levelStartingScore = 0
+        queueRunSeed = UInt64.random(in: UInt64.min...UInt64.max)
+        shotQueue = BunnyQueue(
+            seed: LevelCatalog.queueSeed(for: level.id) ^ queueRunSeed,
+            palette: level.arrivalPalette
+        )
+        currentShot = makeShot(at: 0, on: state.board)
 #if os(tvOS)
         selectedSide = .left
         highlightedLane = min(5, state.board.rowCount - 1)
@@ -1694,7 +1921,7 @@ final class GameScene: SKScene {
             guard let lane = highlightedLane else { return }
             performLaunch(lane: lane)
         case .won:
-            if hasNextLevel {
+            if LevelCatalog.nextLevel(after: level.id) != nil {
                 onRequestNextLevel()
             } else {
                 resetGame()

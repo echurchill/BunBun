@@ -29,6 +29,7 @@ final class HUDTests: XCTestCase {
             isTelevision: isTelevision,
             hudScale: hudScale,
             levelName: levelName,
+            campaignStatus: "LEVEL 1  •  SPRINGTIME CAMP IN 2",
             appVersion: "0.5",
             subtitle: subtitle,
             debugControlText: debugControlText,
@@ -63,12 +64,14 @@ final class HUDTests: XCTestCase {
         XCTAssertNil(layer.childNode(withName: "control:debug"))
 
         XCTAssertEqual(layer.children.compactMap({ $0 as? BunnyNode }).count, 1)
-        let caption = try XCTUnwrap(labels(in: layer).first { $0.horizontalAlignmentMode == .left })
-        XCTAssertEqual(caption.text, "Next   •   Score 1200   •   Hop in 2")
+        let caption = try XCTUnwrap(labels(in: layer).first { $0.text?.hasPrefix("Next") == true })
+        XCTAssertEqual(caption.text, "Next   •   Hop in 2")
+        XCTAssertTrue(labels(in: layer).contains { $0.text == "0001200" })
+        XCTAssertTrue(labels(in: layer).contains { $0.text == "LEVEL 1  •  SPRINGTIME CAMP IN 2" })
 
         // Title, subtitle, restart, 3 meter labels, 3 tracks, 2 fills
         // (the zero dance meter draws no fill), preview, caption.
-        XCTAssertEqual(layer.children.count, 13)
+        XCTAssertEqual(layer.children.count, 15)
     }
 
     @MainActor
@@ -118,8 +121,8 @@ final class HUDTests: XCTestCase {
             danceActive: true
         ))
 
-        let caption = try XCTUnwrap(labels(in: layer).first { $0.horizontalAlignmentMode == .left })
-        XCTAssertEqual(caption.text, "Next BOMB   •   Score 0   •   Hop in 3   •   2×")
+        let caption = try XCTUnwrap(labels(in: layer).first { $0.text?.hasPrefix("Next") == true })
+        XCTAssertEqual(caption.text, "Next BOMB   •   Hop in 3   •   2×")
     }
 
     @MainActor

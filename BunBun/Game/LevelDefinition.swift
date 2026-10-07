@@ -151,6 +151,17 @@ struct LevelDefinition: Equatable, Sendable {
     }
 }
 
+struct CampaignPosition: Equatable, Sendable {
+    let overallLevel: Int
+    let stageInEnvironment: Int
+    let stagesInEnvironment: Int
+    let destinationText: String
+
+    var hudText: String {
+        "LEVEL \(overallLevel)  •  \(destinationText)"
+    }
+}
+
 enum LevelCatalog {
     static let levels: [LevelDefinition] = [
         bunnyLab,
@@ -755,6 +766,52 @@ enum LevelCatalog {
         guard let index = levels.firstIndex(where: { $0.id == id }),
               levels.indices.contains(index + 1) else { return nil }
         return levels[index + 1]
+    }
+
+    static func campaignPosition(for id: LevelID) -> CampaignPosition {
+        guard let overallIndex = levels.firstIndex(where: { $0.id == id }) else {
+            return CampaignPosition(
+                overallLevel: 1,
+                stageInEnvironment: 1,
+                stagesInEnvironment: 1,
+                destinationText: "WELCOME TO CAMP"
+            )
+        }
+
+        let level = levels[overallIndex]
+        let environmentLevels = levels.filter { $0.environment == level.environment }
+        let stageIndex = environmentLevels.firstIndex(where: { $0.id == id }) ?? 0
+        let remaining = environmentLevels.count - stageIndex - 1
+        let nextEnvironment = levels.dropFirst(overallIndex + 1)
+            .first(where: { $0.environment != level.environment })?
+            .environment
+
+        let destinationText: String
+        if stageIndex == 0 {
+            destinationText = level.environment.displayName
+        } else if let nextEnvironment {
+            destinationText = remaining == 0
+                ? "\(nextEnvironment.displayName) NEXT!"
+                : "\(nextEnvironment.displayName) IN \(remaining)"
+        } else if remaining == 0 {
+            destinationText = "BIRTHDAY FINALE"
+        } else {
+            destinationText = "BIRTHDAY FINALE IN \(remaining)"
+        }
+
+        return CampaignPosition(
+            overallLevel: overallIndex + 1,
+            stageInEnvironment: stageIndex + 1,
+            stagesInEnvironment: environmentLevels.count,
+            destinationText: destinationText
+        )
+    }
+
+    static func queueSeed(for id: LevelID) -> UInt64 {
+        let index = levels.firstIndex(where: { $0.id == id }) ?? 0
+        let level = definition(for: id)
+        return UInt64(index + 1) &* 0x9E37_79B9
+            &+ UInt64(level.arrivalSeed + 1) &* 0x85EB_CA6B
     }
 
     private static func layout(_ rows: [Int: [Int: BunnyColor]]) -> [Cell: PrototypeShot] {

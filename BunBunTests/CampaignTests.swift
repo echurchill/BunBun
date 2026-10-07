@@ -129,6 +129,56 @@ final class LevelDefinitionTests: XCTestCase {
             )
         }
     }
+
+    func testCampaignPositionsDescribeThemedArcsAndNextDestination() {
+        let opening = LevelCatalog.campaignPosition(for: .bunnyLab)
+        XCTAssertEqual(opening.overallLevel, 1)
+        XCTAssertEqual(opening.stageInEnvironment, 1)
+        XCTAssertEqual(opening.stagesInEnvironment, 3)
+        XCTAssertEqual(opening.destinationText, "SUNSET CAMP")
+
+        let desertFinale = LevelCatalog.campaignPosition(for: .sunsetShuffle)
+        XCTAssertEqual(desertFinale.stageInEnvironment, 3)
+        XCTAssertEqual(desertFinale.destinationText, "SPRINGTIME CAMP NEXT!")
+
+        let finale = LevelCatalog.campaignPosition(for: .birthdayBash)
+        XCTAssertEqual(finale.overallLevel, 12)
+        XCTAssertEqual(finale.destinationText, "BIRTHDAY FINALE")
+    }
+
+    func testBoardAwareBunnyQueueIsSeededVariedAndProtectsAgainstTriples() {
+        var board = Board()
+        XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: 2, row: 4)))
+        XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: 3, row: 4)))
+
+        var first = BunnyQueue(seed: 42, palette: [.blue, .green])
+        var second = BunnyQueue(seed: 42, palette: [.blue, .green])
+        let firstRun = (0..<30).map { _ in first.next(on: board).color }
+        let replay = (0..<30).map { _ in second.next(on: board).color }
+
+        XCTAssertEqual(firstRun, replay)
+        XCTAssertEqual(Set(firstRun), Set([.blue, .green]))
+        for index in 2..<firstRun.count {
+            XCTAssertFalse(
+                firstRun[index] == firstRun[index - 1]
+                    && firstRun[index] == firstRun[index - 2],
+                "The queue should prevent three-color streaks"
+            )
+        }
+    }
+
+    func testBoardPairsReceiveModestQueueWeightAndSpecialKindIsPreserved() {
+        var board = Board()
+        XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: 2, row: 4)))
+        XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: 3, row: 4)))
+        var queue = BunnyQueue(seed: 7, palette: [.blue, .green])
+
+        let bag = (0..<5).map { _ in queue.next(on: board, kind: .lineClear) }
+
+        XCTAssertEqual(bag.filter { $0.color == .blue }.count, 3)
+        XCTAssertEqual(bag.filter { $0.color == .green }.count, 2)
+        XCTAssertTrue(bag.allSatisfy { $0.kind == .lineClear })
+    }
 }
 
 final class CampaignStateTests: XCTestCase {

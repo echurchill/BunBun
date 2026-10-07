@@ -59,6 +59,29 @@ final class GamePressureTests: XCTestCase {
         XCTAssertEqual(state.dancePartyTurnsRemaining, 3)
     }
 
+    func testScoringProducesPresentationEventsForEveryChainStage() {
+        var board = Board()
+        for column in 2...3 {
+            XCTAssertTrue(board.place(Bunny(color: .blue), at: Cell(column: column, row: 1)))
+        }
+        var state = GameState(board: board)
+
+        let outcome = state.launch(Bunny(color: .blue), from: .left, lane: 1)
+
+        XCTAssertEqual(outcome.scoreEvents, [
+            ScoreEvent(
+                chainDepth: 1,
+                removedBunnies: 3,
+                specialActivations: 0,
+                multiplier: 1,
+                points: 300,
+                praise: .good
+            )
+        ])
+        XCTAssertEqual(outcome.pointsAwarded, 300)
+        XCTAssertEqual(state.score, 300)
+    }
+
     func testLargeComboWrapsDanceChargeWithoutOverflowingMeter() {
         let rules = GameRules(
             launchesPerAdvance: 3,

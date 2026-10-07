@@ -22,6 +22,7 @@ enum HUD {
         let isTelevision: Bool
         let hudScale: CGFloat
         let levelName: String
+        let campaignStatus: String
         let appVersion: String
         let subtitle: String
         /// Text for the debug toggle, or nil when the toggle is hidden
@@ -50,6 +51,25 @@ enum HUD {
         title.fontColor = .white
         title.position = CGPoint(x: context.size.width / 2, y: context.size.height - 82)
         layer.addChild(title)
+
+        let topInset: CGFloat = context.isTelevision ? 150 : (context.isTablet ? 86 : 54)
+        let score = SKLabelNode(fontNamed: "AvenirNext-Heavy")
+        score.name = "score"
+        score.text = String(format: "%07d", context.score)
+        score.fontSize = 13 * context.hudScale
+        score.fontColor = .white
+        score.horizontalAlignmentMode = .left
+        score.position = CGPoint(x: topInset, y: context.size.height - 51)
+        layer.addChild(score)
+
+        let campaign = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        campaign.name = "campaign-status"
+        campaign.text = context.campaignStatus
+        campaign.fontSize = 9 * context.hudScale
+        campaign.fontColor = SKColor(white: 0.82, alpha: 1)
+        campaign.horizontalAlignmentMode = .right
+        campaign.position = CGPoint(x: context.size.width - topInset, y: context.size.height - 49)
+        layer.addChild(campaign)
 
         let subtitle = SKLabelNode(fontNamed: "AvenirNext-Medium")
         subtitle.text = context.subtitle
@@ -98,7 +118,6 @@ enum HUD {
         let label = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
         label.text = previewCaption(
             shotKind: context.shotKind,
-            score: context.score,
             launchesUntilAdvance: context.launchesUntilAdvance,
             danceActive: context.danceActive
         )
@@ -139,7 +158,6 @@ enum HUD {
 
     private static func previewCaption(
         shotKind: BunnyKind,
-        score: Int,
         launchesUntilAdvance: Int,
         danceActive: Bool
     ) -> String {
@@ -149,7 +167,7 @@ enum HUD {
         case .redBomb: "Next BOMB"
         case .lineClear: "Next LINE"
         }
-        return "\(nextName)   •   Score \(score)   •   Hop in \(launchesUntilAdvance)\(multiplier)"
+        return "\(nextName)   •   Hop in \(launchesUntilAdvance)\(multiplier)"
     }
 
     private static func addControl(
