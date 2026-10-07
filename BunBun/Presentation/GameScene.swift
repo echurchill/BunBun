@@ -53,6 +53,7 @@ final class GameScene: SKScene {
     private var selectedSide: LaunchSide = .bottom
     private var highlightedLane: Int?
     private var isAnimating = false
+    private var isPreparingAssets = true
 #if DEBUG
     private var showsDebug = false
 #endif
@@ -60,6 +61,12 @@ final class GameScene: SKScene {
     private var didReportCompletion = false
     private var didPlayEndCue = false
     private var playtestStats = PlaytestRunStats()
+
+#if os(iOS)
+    private let launchFeedback = UIImpactFeedbackGenerator(style: .light)
+    private let matchFeedback = UINotificationFeedbackGenerator()
+    private let advanceFeedback = UIImpactFeedbackGenerator(style: .medium)
+#endif
 
     private let backgroundLayer = SKNode()
     private let ambientLightLayer = SKNode()
@@ -166,10 +173,19 @@ final class GameScene: SKScene {
         highlightedLane = min(5, state.board.rowCount - 1)
 #endif
         renderAll()
-        // The cleaned sheets are inexpensive to split, and asking SpriteKit to
-        // upload them now prevents the first cascade or dance party from
-        // compiling/uploading several animation sets during a live transition.
-        BunnyNode.preloadAnimationTextures()
+        // Do not accept the first shot until SpriteKit confirms that every
+        // gameplay animation is resident. The old fire-and-forget preload could
+        // still be uploading celebration frames when an early combo began.
+        BunnyNode.preloadAnimationTextures { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.isPreparingAssets = false
+            }
+        }
+#if os(iOS)
+        launchFeedback.prepare()
+        matchFeedback.prepare()
+        advanceFeedback.prepare()
+#endif
         audio.startMusic()
         updateAudioMix()
     }
@@ -195,12 +211,16 @@ final class GameScene: SKScene {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !isAnimating, let point = touches.first?.location(in: self) else { return }
+        guard !isPreparingAssets,
+              !isAnimating,
+              let point = touches.first?.location(in: self) else { return }
         updateHighlight(at: point)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !isAnimating, let point = touches.first?.location(in: self) else { return }
+        guard !isPreparingAssets,
+              !isAnimating,
+              let point = touches.first?.location(in: self) else { return }
         updateHighlight(at: point)
     }
 
@@ -211,7 +231,9 @@ final class GameScene: SKScene {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !isAnimating, let point = touches.first?.location(in: self) else { return }
+        guard !isPreparingAssets,
+              !isAnimating,
+              let point = touches.first?.location(in: self) else { return }
 
         if let control = controlName(at: point) {
             highlightedLane = nil
@@ -335,9 +357,10 @@ final class GameScene: SKScene {
         move.timingMode = .easeInEaseOut
         projectile.run(.sequence([
             .group([move, .scale(to: destinationScale, duration: duration)]),
-            .run {
+            .run { [weak self] in
 #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                self?.launchFeedback.impactOccurred()
+                self?.launchFeedback.prepare()
 #endif
             },
             .removeFromParent(),
@@ -382,7 +405,8 @@ final class GameScene: SKScene {
         }
         flashMessage(message, color: .systemYellow)
 #if os(iOS)
-        UINotificationFeedbackGenerator().notificationOccurred(stage.depth == 1 ? .success : .warning)
+        matchFeedback.notificationOccurred(stage.depth == 1 ? .success : .warning)
+        matchFeedback.prepare()
 #endif
         addConfetti(for: stage.depth)
 
@@ -458,7 +482,8 @@ final class GameScene: SKScene {
             ]))
         }
 #if os(iOS)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        advanceFeedback.impactOccurred()
+        advanceFeedback.prepare()
 #endif
         let postTransitionWait = outcome.fallenBunnies.isEmpty ? 0.40 : 1.85
         run(.sequence([
@@ -1636,7 +1661,7 @@ final class GameScene: SKScene {
     }
 
     func handleTelevisionNavigation(_ navigation: TelevisionNavigation) {
-        guard !isAnimating else { return }
+        guard !isPreparingAssets, !isAnimating else { return }
 
         let sides: [LaunchSide] = [.left, .bottom, .right]
         var lane = highlightedLane ?? 0
@@ -1662,7 +1687,7 @@ final class GameScene: SKScene {
     }
 
     func handleTelevisionSelect() {
-        guard !isAnimating else { return }
+        guard !isPreparingAssets, !isAnimating else { return }
 
         switch state.status {
         case .playing:

@@ -4,7 +4,7 @@ private let sampleRate = 22_050
 private let tempo = 116.0
 private let beatDuration = 60.0 / tempo
 private let barDuration = beatDuration * 4
-private let musicDuration = barDuration * 16
+private let musicDuration = barDuration * 32
 private let twoPi = Double.pi * 2
 
 private struct Sound {
@@ -184,37 +184,130 @@ private func addChord(
     }
 }
 
+private struct NoteStep {
+    let step: Int
+    let note: Int
+    let length: Int
+    let accent: Double
+}
+
+/// A bright, rounded pluck made from inexpensive harmonic layers. It carries
+/// the main hook more clearly than the old single triangle oscillator while
+/// remaining deliberately synthetic and fully reproducible.
+private func addPluck(
+    to sound: inout Sound,
+    at time: Double,
+    note: Int,
+    duration: Double,
+    gain: Double
+) {
+    let fundamental = frequency(note)
+    sound.tone(
+        start: time,
+        duration: duration,
+        frequency: fundamental,
+        gain: gain,
+        waveform: .triangle,
+        attack: 0.008,
+        releasePower: 3.1
+    )
+    sound.tone(
+        start: time,
+        duration: duration * 0.72,
+        frequency: fundamental * 2,
+        gain: gain * 0.23,
+        waveform: .sine,
+        attack: 0.006,
+        releasePower: 3.8
+    )
+    sound.tone(
+        start: time,
+        duration: duration * 0.48,
+        frequency: fundamental * 3,
+        gain: gain * 0.07,
+        waveform: .sine,
+        attack: 0.004,
+        releasePower: 4.6
+    )
+}
+
 private func makeBase() -> Sound {
     var sound = Sound(duration: musicDuration)
-    let roots = [48, 45, 41, 43] // C, A, F, G
-    let chords = [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]]
-    let bassSteps = [0, 0, 7, 12, 0, 7, 10, 7]
+    // Eight-bar C-major progression: familiar first half, warmer answer in
+    // the second. Four repetitions make a roughly 66-second fatigue-friendly
+    // loop rather than the previous 33-second cycle.
+    let roots = [48, 45, 41, 43, 48, 40, 41, 43] // C, A, F, G, C, E, F, G
+    let chords = [
+        [60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62],
+        [60, 64, 67], [52, 55, 59], [53, 57, 60], [55, 59, 62]
+    ]
+    let bassPatterns: [[Int?]] = [
+        [0, nil, 12, 7, 0, nil, 7, 12],
+        [0, 7, 12, nil, 0, 12, 7, nil],
+        [0, nil, 7, 12, 0, 7, 10, 7],
+        [0, 7, nil, 12, 0, 10, 7, 12]
+    ]
 
-    for bar in 0..<16 {
+    for bar in 0..<32 {
         let barStart = Double(bar) * barDuration
-        let variation = bar % 4
+        let harmony = bar % roots.count
+        let phrase = bar / 8
         for beat in 0..<4 {
             let time = barStart + Double(beat) * beatDuration
-            if beat == 0 || beat == 2 { addKick(to: &sound, at: time, gain: beat == 0 ? 0.72 : 0.60) }
+            if beat == 0 || beat == 2 {
+                addKick(to: &sound, at: time, gain: beat == 0 ? 0.70 : 0.56)
+            }
             if beat == 1 || beat == 3 { addSnare(to: &sound, at: time, seed: UInt64(bar * 10 + beat)) }
-            if variation == 3 && beat == 3 { addKick(to: &sound, at: time + beatDuration * 0.72, gain: 0.40) }
+            if harmony == 7 && beat == 3 {
+                addKick(to: &sound, at: time + beatDuration * 0.72, gain: 0.38)
+            }
         }
+
+        let bassPattern = bassPatterns[bar % bassPatterns.count]
         for eighth in 0..<8 {
             let time = barStart + Double(eighth) * beatDuration / 2
-            addHat(to: &sound, at: time, seed: UInt64(1000 + bar * 20 + eighth), gain: eighth.isMultiple(of: 2) ? 0.075 : 0.12)
-            let bassNote = roots[variation] + bassSteps[eighth] % 12
+            addHat(
+                to: &sound,
+                at: time,
+                seed: UInt64(1_000 + bar * 20 + eighth),
+                gain: eighth.isMultiple(of: 2) ? 0.062 : 0.105
+            )
+            guard let interval = bassPattern[eighth] else { continue }
+            let bassNote = roots[harmony] + interval
             sound.tone(
                 start: time,
-                duration: beatDuration * 0.43,
+                duration: beatDuration * (eighth == 7 ? 0.28 : 0.40),
                 frequency: frequency(bassNote),
-                gain: 0.28,
+                gain: phrase == 2 ? 0.23 : 0.27,
                 waveform: .softSquare,
-                attack: 0.02,
-                releasePower: 1.4
+                attack: 0.015,
+                releasePower: 1.65
             )
         }
-        addChord(to: &sound, at: barStart + beatDuration * 0.48, notes: chords[variation], duration: beatDuration * 0.62, gain: 0.28)
-        addChord(to: &sound, at: barStart + beatDuration * 2.48, notes: chords[variation], duration: beatDuration * 0.75, gain: 0.24)
+
+        addChord(
+            to: &sound,
+            at: barStart + beatDuration * 0.48,
+            notes: chords[harmony],
+            duration: beatDuration * 0.48,
+            gain: 0.25
+        )
+        addChord(
+            to: &sound,
+            at: barStart + beatDuration * 2.48,
+            notes: chords[harmony],
+            duration: beatDuration * 0.58,
+            gain: 0.22
+        )
+        if phrase == 1 || phrase == 3 {
+            addChord(
+                to: &sound,
+                at: barStart + beatDuration * 3.48,
+                notes: chords[harmony],
+                duration: beatDuration * 0.30,
+                gain: 0.12
+            )
+        }
     }
     sound.normalize()
     return sound
@@ -222,23 +315,91 @@ private func makeBase() -> Sound {
 
 private func makeMelody() -> Sound {
     var sound = Sound(duration: musicDuration)
-    // Original four-bar call-and-response hook in C major.
-    let hook: [[Int?]] = [
-        [64, 67, 69, 67, 64, nil, 62, 64],
-        [67, 72, 71, 69, 67, nil, 64, 62],
-        [65, 69, 72, 69, 67, 65, 64, nil],
-        [62, 67, 71, 74, 72, 71, 67, nil]
+    // Original syncopated four-bar call-and-response hook. The repeated
+    // short-long "bun-bun" pickup gives the tune a stronger verbal shape,
+    // while the bridge leaves breathing room during a long puzzle session.
+    let hook: [[NoteStep]] = [
+        [
+            NoteStep(step: 0, note: 76, length: 2, accent: 1.0),
+            NoteStep(step: 3, note: 79, length: 1, accent: 0.82),
+            NoteStep(step: 5, note: 81, length: 2, accent: 0.96),
+            NoteStep(step: 8, note: 79, length: 2, accent: 0.90),
+            NoteStep(step: 11, note: 76, length: 1, accent: 0.76),
+            NoteStep(step: 13, note: 74, length: 2, accent: 0.84)
+        ],
+        [
+            NoteStep(step: 0, note: 79, length: 2, accent: 0.96),
+            NoteStep(step: 3, note: 84, length: 2, accent: 1.0),
+            NoteStep(step: 6, note: 83, length: 1, accent: 0.72),
+            NoteStep(step: 8, note: 81, length: 2, accent: 0.90),
+            NoteStep(step: 11, note: 79, length: 1, accent: 0.76),
+            NoteStep(step: 13, note: 76, length: 2, accent: 0.88)
+        ],
+        [
+            NoteStep(step: 0, note: 77, length: 2, accent: 0.92),
+            NoteStep(step: 3, note: 81, length: 1, accent: 0.78),
+            NoteStep(step: 5, note: 84, length: 2, accent: 1.0),
+            NoteStep(step: 8, note: 81, length: 2, accent: 0.88),
+            NoteStep(step: 11, note: 79, length: 1, accent: 0.75),
+            NoteStep(step: 13, note: 76, length: 2, accent: 0.82)
+        ],
+        [
+            NoteStep(step: 0, note: 74, length: 2, accent: 0.85),
+            NoteStep(step: 3, note: 79, length: 1, accent: 0.78),
+            NoteStep(step: 5, note: 83, length: 2, accent: 0.95),
+            NoteStep(step: 8, note: 86, length: 1, accent: 0.86),
+            NoteStep(step: 10, note: 84, length: 2, accent: 1.0),
+            NoteStep(step: 13, note: 79, length: 1, accent: 0.72),
+            NoteStep(step: 15, note: 76, length: 1, accent: 0.88)
+        ]
+    ]
+    let bridge: [[NoteStep]] = [
+        [
+            NoteStep(step: 0, note: 72, length: 3, accent: 0.70),
+            NoteStep(step: 6, note: 76, length: 2, accent: 0.68),
+            NoteStep(step: 11, note: 79, length: 3, accent: 0.76)
+        ],
+        [
+            NoteStep(step: 2, note: 71, length: 2, accent: 0.66),
+            NoteStep(step: 7, note: 74, length: 2, accent: 0.68),
+            NoteStep(step: 12, note: 79, length: 2, accent: 0.74)
+        ],
+        [
+            NoteStep(step: 0, note: 69, length: 3, accent: 0.64),
+            NoteStep(step: 6, note: 72, length: 2, accent: 0.68),
+            NoteStep(step: 11, note: 76, length: 3, accent: 0.74)
+        ],
+        [
+            NoteStep(step: 2, note: 74, length: 2, accent: 0.68),
+            NoteStep(step: 7, note: 79, length: 2, accent: 0.74),
+            NoteStep(step: 12, note: 83, length: 3, accent: 0.82)
+        ]
     ]
 
-    for bar in 0..<16 {
-        // Leave breathing room during the third phrase before returning to the hook.
-        if bar == 8 || bar == 10 { continue }
+    for bar in 0..<32 {
         let barStart = Double(bar) * barDuration
-        for (step, note) in hook[bar % 4].enumerated() {
-            guard let note else { continue }
-            let time = barStart + Double(step) * beatDuration / 2
-            sound.tone(start: time, duration: beatDuration * 0.39, frequency: frequency(note + 12), gain: 0.22, waveform: .triangle, attack: 0.025, releasePower: 2.4)
-            sound.tone(start: time, duration: beatDuration * 0.30, frequency: frequency(note + 24), gain: 0.055, waveform: .sine, attack: 0.02, releasePower: 2.8)
+        let isBridge = (8..<12).contains(bar) || (24..<28).contains(bar)
+        let phrase = isBridge ? bridge[bar % 4] : hook[bar % 4]
+        let sectionGain = isBridge ? 0.17 : 0.23
+        for event in phrase {
+            let time = barStart + Double(event.step) * beatDuration / 4
+            let duration = Double(event.length) * beatDuration / 4 * 0.90
+            addPluck(
+                to: &sound,
+                at: time,
+                note: event.note,
+                duration: duration,
+                gain: sectionGain * event.accent
+            )
+            // A quiet dotted echo helps the hook sing without turning the
+            // normal puzzle mix into a wall of notes.
+            addPluck(
+                to: &sound,
+                at: time + beatDuration * 0.36,
+                note: event.note,
+                duration: duration * 0.58,
+                gain: sectionGain * event.accent * 0.14
+            )
         }
     }
     sound.normalize()
@@ -247,7 +408,8 @@ private func makeMelody() -> Sound {
 
 private func makePressure() -> Sound {
     var sound = Sound(duration: musicDuration)
-    for bar in 0..<16 {
+    let pulseNotes = [72, 69, 65, 67, 72, 64, 65, 67]
+    for bar in 0..<32 {
         let barStart = Double(bar) * barDuration
         for sixteenth in 0..<16 {
             let time = barStart + Double(sixteenth) * beatDuration / 4
@@ -257,7 +419,15 @@ private func makePressure() -> Sound {
         }
         for beat in 0..<4 {
             let time = barStart + Double(beat) * beatDuration
-            sound.tone(start: time, duration: 0.10, frequency: frequency(72 + (bar % 4 == 3 ? 2 : 0)), gain: 0.12, waveform: .square, attack: 0.01, releasePower: 4.5)
+            sound.tone(
+                start: time,
+                duration: 0.10,
+                frequency: frequency(pulseNotes[bar % pulseNotes.count] + (beat == 3 ? 7 : 0)),
+                gain: 0.105,
+                waveform: .square,
+                attack: 0.01,
+                releasePower: 4.5
+            )
         }
     }
     sound.normalize()
@@ -266,10 +436,13 @@ private func makePressure() -> Sound {
 
 private func makeDance() -> Sound {
     var sound = Sound(duration: musicDuration)
-    let roots = [48, 45, 41, 43] // C, A, F, G -- synchronized with the base loop.
-    let chords = [[72, 76, 79], [69, 72, 76], [65, 69, 72], [67, 71, 74]]
-    let counter = [72, 76, 79, 84, 79, 76, 74, 79]
-    for bar in 0..<16 {
+    let roots = [48, 45, 41, 43, 48, 40, 41, 43]
+    let chords = [
+        [72, 76, 79], [69, 72, 76], [65, 69, 72], [67, 71, 74],
+        [72, 76, 79], [64, 67, 71], [65, 69, 72], [67, 71, 74]
+    ]
+    let partyAnswers = [84, 79, 81, 76, 84, 83, 81, 79]
+    for bar in 0..<32 {
         let barStart = Double(bar) * barDuration
 
         // A clear four-on-the-floor pulse makes the party audible immediately,
@@ -282,7 +455,8 @@ private func makeDance() -> Sound {
             }
         }
 
-        let root = roots[bar % roots.count]
+        let harmony = bar % roots.count
+        let root = roots[harmony]
         for eighth in 0..<8 {
             let time = barStart + Double(eighth) * beatDuration / 2
             addHat(
@@ -295,14 +469,29 @@ private func makeDance() -> Sound {
             // Bouncy octave bass and a bright answer phrase distinguish this
             // from the calmer base groove without changing tempo or harmony.
             let bassNote = root + (eighth.isMultiple(of: 2) ? 12 : 0)
-            sound.tone(start: time, duration: beatDuration * 0.33, frequency: frequency(bassNote), gain: 0.24, waveform: .softSquare, attack: 0.015, releasePower: 1.8)
+            sound.tone(start: time, duration: beatDuration * 0.31, frequency: frequency(bassNote), gain: 0.22, waveform: .softSquare, attack: 0.012, releasePower: 1.9)
             if eighth % 2 == 1 {
-                sound.tone(start: time, duration: beatDuration * 0.25, frequency: frequency(counter[(eighth + bar * 2) % counter.count] + 12), gain: 0.19, waveform: .triangle, attack: 0.015, releasePower: 3.0)
+                addPluck(
+                    to: &sound,
+                    at: time,
+                    note: partyAnswers[(eighth + bar) % partyAnswers.count],
+                    duration: beatDuration * 0.28,
+                    gain: 0.19
+                )
             }
         }
 
-        addChord(to: &sound, at: barStart + beatDuration * 0.48, notes: chords[bar % chords.count], duration: beatDuration * 0.30, gain: 0.40)
-        addChord(to: &sound, at: barStart + beatDuration * 2.48, notes: chords[bar % chords.count], duration: beatDuration * 0.30, gain: 0.38)
+        // Four off-beat disco stabs make the switch audible regardless of the
+        // beat on which the Dance meter fills.
+        for beat in 0..<4 {
+            addChord(
+                to: &sound,
+                at: barStart + (Double(beat) + 0.48) * beatDuration,
+                notes: chords[harmony],
+                duration: beatDuration * 0.27,
+                gain: beat.isMultiple(of: 2) ? 0.32 : 0.27
+            )
+        }
 
         if bar % 4 == 3 {
             for step in 0..<4 {
@@ -489,8 +678,8 @@ private func generateAssets() throws {
         print("Wrote \(name)")
     }
 
-    // A convenient A/B reference for listening outside the game: eight bars
-    // of the regular mix followed by eight bars of the dance-party mix.
+    // A convenient A/B reference for listening outside the game: sixteen bars
+    // of the regular mix followed by sixteen bars of the dance-party mix.
     var preview = Sound(duration: musicDuration)
     let transitionSample = preview.samples.count / 2
     for index in preview.samples.indices {

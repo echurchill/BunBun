@@ -126,9 +126,13 @@ private final class BunnyAnimationLibrary {
         return textures
     }
 
-    func preloadGameplayTextures() {
+    func preloadGameplayTextures(completion: @Sendable @escaping () -> Void) {
         let textures = BunnyMotion.allCases.flatMap { self.textures(for: $0) }
-        SKTexture.preload(textures, withCompletionHandler: {})
+        guard !textures.isEmpty else {
+            completion()
+            return
+        }
+        SKTexture.preload(textures, withCompletionHandler: completion)
     }
 }
 
@@ -137,7 +141,11 @@ private final class BunnyAnimationLibrary {
 @MainActor
 final class BunnyNode: SKNode {
     static func preloadAnimationTextures() {
-        BunnyAnimationLibrary.shared.preloadGameplayTextures()
+        preloadAnimationTextures(completion: {})
+    }
+
+    static func preloadAnimationTextures(completion: @Sendable @escaping () -> Void) {
+        BunnyAnimationLibrary.shared.preloadGameplayTextures(completion: completion)
     }
 
     let bunnyID: UUID

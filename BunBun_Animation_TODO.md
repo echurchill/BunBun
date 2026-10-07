@@ -72,6 +72,14 @@ Use a genuinely transparent alpha background. No floor, shadows, scenery, text, 
 - Stagger loops and use multiple dance cycles. Perfect synchronization makes a lively crowd look mechanical.
 - Treat generated artwork as prototype production material until its commercial-use terms and final provenance are archived.
 
+## Runtime warm-up — October 6, 2026
+
+- The game now keeps launch input disabled until SpriteKit's asynchronous preload completion confirms that all ten gameplay animation sets are resident.
+- The previous fire-and-forget preload could overlap an unusually quick first match, making the first celebration or chain hesitate while later combos remained smooth.
+- Reusable launch, match, and advancement feedback generators are prepared when the scene appears instead of being allocated for the first time during gameplay.
+- Audio effects continue to be constructed and prepared on the dedicated audio queue when the level starts.
+- These changes affect only readiness and presentation; the rules engine and turn sequence remain unchanged.
+
 ## Remaining animation to-do
 
 - Add a gentle blink or glance variation that can be layered without restarting idle animation.

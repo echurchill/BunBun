@@ -1,3 +1,4 @@
+import AVFAudio
 import XCTest
 @testable import BunBun
 
@@ -58,5 +59,32 @@ final class AudioResourcesTests: XCTestCase {
                 "\(layer) should resolve to a bundled stem"
             )
         }
+    }
+
+    func testAdaptiveMusicStemsRemainSampleAlignedAndLongEnoughForPlay() throws {
+        let files = try AudioDirector.MusicLayer.allCases.map { layer -> AVAudioFile in
+            let url = try XCTUnwrap(
+                Bundle(for: Self.self).url(
+                    forResource: layer.rawValue,
+                    withExtension: "wav",
+                    subdirectory: "Audio"
+                )
+            )
+            return try AVAudioFile(forReading: url)
+        }
+        let reference = try XCTUnwrap(files.first)
+
+        for file in files {
+            XCTAssertEqual(file.length, reference.length)
+            XCTAssertEqual(file.fileFormat.sampleRate, reference.fileFormat.sampleRate)
+            XCTAssertEqual(
+                file.fileFormat.channelCount,
+                reference.fileFormat.channelCount
+            )
+        }
+
+        let duration = Double(reference.length) / reference.fileFormat.sampleRate
+        XCTAssertGreaterThan(duration, 60)
+        XCTAssertLessThan(duration, 70)
     }
 }

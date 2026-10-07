@@ -125,13 +125,26 @@ The first adaptive audio vertical slice is now playable on iPhone, iPad, and App
 
 ### Prototype score
 
-- The score is an original 116-BPM, 4/4, C-major electro-funk loop lasting 16 bars (about 33.1 seconds).
+- The score is an original 116-BPM, 4/4, C-major electro-funk loop lasting 32 bars (about 66.2 seconds).
 - Four sample-aligned mono WAV stems start together and remain running together: base groove, melodic hook, pressure percussion, and dance sweetener.
 - The base and hook play during normal puzzle play.
 - The pressure stem fades in on a curved response to the danger meter rather than switching on abruptly.
 - Dance parties crossfade in brighter claps and a counter-melody without restarting or losing the beat.
 - A full-mix `BunBunThemePreview.wav` is retained in `Tools/AudioPreview` for quick listening outside the game. It is deliberately outside `BunBun/Resources/Audio`, whose whole-folder reference would otherwise embed it in every install.
-- Stem compression was evaluated in September 2026 and deferred: the stems stay sample-aligned mono WAVs to protect gapless 33-second loops, since lossy re-encoding needs device listening tests this environment cannot run. Apple Lossless remains the preferred future format when an encoder is available.
+- Stem compression was evaluated in September 2026 and deferred: the stems stay sample-aligned mono WAVs to protect gapless 66-second loops, since lossy re-encoding needs device listening tests this environment cannot run. Apple Lossless remains the preferred future format when an encoder is available.
+
+### Second composition pass — October 6, 2026
+
+- Doubled the arrangement from 16 to 32 bars so the complete harmonic and melodic cycle takes about 66 seconds to repeat.
+- Replaced the mechanically even lead with an original syncopated four-bar call-and-response hook built around a short-long “bun-bun” pickup.
+- Added two quieter bridge passages so the hook can leave space and return instead of playing almost continuously.
+- Expanded the harmony into an eight-bar progression and gave the bass four alternating syncopated patterns.
+- Rebuilt the lead as a rounded three-part pluck with restrained echo rather than one exposed triangle oscillator.
+- Strengthened the dance arrangement with four-on-the-floor kick, claps, octave bass, bright answer notes, and off-beat disco chord stabs that are audible regardless of when the dance crossfade begins.
+- Kept all four stems exactly sample-aligned and added an automated duration/format/alignment test.
+- Retained the deterministic generator and the same runtime filenames, so the adaptive audio controller and replacement contract did not change.
+
+This is a stronger prototype composition, not a declaration that the final birthday score is finished. Physical-device listening still decides hook quality, speaker balance, fatigue, and whether a GarageBand or licensed assisted-production pass is worthwhile.
 
 The prototype score and effects are generated deterministically by `Tools/make_audio_assets.swift`. They contain no sampled commercial recording, no copied melody, no artist imitation, and no dependency on an AI-service license. Running this command regenerates the complete set:
 
