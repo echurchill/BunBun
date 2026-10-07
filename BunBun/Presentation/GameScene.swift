@@ -250,6 +250,12 @@ final class GameScene: SKScene {
         let shot = level.shot(at: currentShotIndex)
         let bunny = shot.makeBunny()
         let newRow = level.advanceRow(forTurn: currentShotIndex)
+        // The rules resolve the whole turn synchronously, but the scene still
+        // has to present the pre-launch board until the projectile lands.
+        // Keep this snapshot for releasing the aim pose; consulting
+        // `state.board` below would move survivors to their post-chain or
+        // post-advance cells before the shot had even arrived.
+        let boardBeforeLaunch = state.board
 
         let outcome = state.launch(
             bunny,
@@ -262,7 +268,7 @@ final class GameScene: SKScene {
         highlightedLane = nil
         isAnimating = true
         drawGrid()
-        updateAimReactions()
+        updateAimReactions(using: boardBeforeLaunch)
 
         animateShot(
             bunny: bunny,
@@ -1179,10 +1185,11 @@ final class GameScene: SKScene {
         )
     }
 
-    private func updateAimReactions() {
+    private func updateAimReactions(using boardSnapshot: Board? = nil) {
+        let reactionBoard = boardSnapshot ?? state.board
         let orderedCells: [Cell]
         if let highlightedLane {
-            let candidates = state.board.occupants.keys.filter { cell in
+            let candidates = reactionBoard.occupants.keys.filter { cell in
                 selectedSide == .bottom
                     ? cell.column == highlightedLane
                     : cell.row == highlightedLane
@@ -1207,7 +1214,7 @@ final class GameScene: SKScene {
         drawAimGuide(to: destinationCell)
         updateBoardLean()
 
-        for (cell, bunny) in state.board.occupants {
+        for (cell, bunny) in reactionBoard.occupants {
             guard let node = bunnyLayer.childNode(
                 withName: "bunny:\(bunny.id.uuidString)"
             ) as? BunnyNode else { continue }
